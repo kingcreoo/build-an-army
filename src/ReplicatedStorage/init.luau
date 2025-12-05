@@ -90,20 +90,35 @@ SETTINGS.TARGET_DATA = {
         ["TotalHealth"] = 3,
         ["TotalRespawnTime"] = 2,
         ["Reward"] = 3,
-        ["Color"] = Color3.fromRGB(255, 66, 66)
+        ["Color"] = Color3.fromRGB(255, 66, 66),
+        ["Price"] = 0
     },
     ["Target2"] = {
         ["TotalHealth"] = 5,
         ["TotalRespawnTime"] = 1.8,
         ["Reward"] = 10,
-        ["Color"] = Color3.fromRGB(255, 66, 66)
+        ["Color"] = Color3.fromRGB(255, 66, 66),
+        ["Price"] = 200
     },
     ["Target3"] = {
         ["TotalHealth"] = 10,
         ["TotalRespawnTime"] = 1.7,
         ["Reward"] = 25,
-        ["Color"] = Color3.fromRGB(255, 66, 66)
+        ["Color"] = Color3.fromRGB(255, 66, 66),
+        ["Price"] = 500
     }
+}
+
+SETTINGS.TARGET_ORDER = {
+    "Target1", "Target2", "Target3"
+}
+
+SETTINGS.SLOT_PRICES = {
+    [3] = 1000,
+    [4] = 10000,
+    [5] = 25000,
+    [6] = 25000,
+    [7] = "VIP"
 }
 
 SETTINGS.DISTANCES = {
