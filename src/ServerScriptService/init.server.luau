@@ -32,6 +32,7 @@ local PurchaseSoldierFunction: RemoteFunction = Remotes:WaitForChild("PurchaseSo
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSoldier")
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
+local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -126,15 +127,51 @@ local function InjectSoldier(Player: Player, Type: string)
 end
 
 local function InjectTarget(Player: Player, TargetType: string)
-    local PlayerData = Data.Get(Player)
+	local PlayerData = Data.Get(Player)
 
-    if not PlayerData["Inventory"]["TargetInventory"][TargetType] then
-        PlayerData["Inventory"]["TargetInventory"][TargetType] = true
-    end
+	if not PlayerData["Inventory"]["TargetInventory"][TargetType] then
+		PlayerData["Inventory"]["TargetInventory"][TargetType] = true
+	end
 
-    if PlayerData["Inventory"]["ActiveTarget"] ~= TargetType then
-        PlayerPlotManagers[Player.Name]:SetTarget(TargetType)
-    end
+	if PlayerData["Inventory"]["ActiveTarget"] ~= TargetType then
+		PlayerPlotManagers[Player.Name]:SetTarget(TargetType)
+	end
+end
+
+local function PurchaseTarget(Player: Player)
+	-- 1) Get player data
+	local PlayerData = Data.Get(Player)
+
+	-- 2) Find current target and calculate next target
+	local CurrentTarget = PlayerData["Inventory"]["ActiveTarget"]
+	local CurrentIndex = table.find(SETTINGS.TARGET_ORDER, CurrentTarget)
+	local NextTarget = SETTINGS.TARGET_ORDER[CurrentIndex + 1]
+
+	-- 3) Check if there's a next target to purchase
+	if not NextTarget then
+		return "Complete", nil
+	end
+
+	-- 4) Check if player has sufficient funds
+	local Price = SETTINGS.TARGET_DATA[NextTarget].Price
+	if PlayerData["leaderstats"]["Credits"] < Price then
+		return "Insufficient", nil
+	end
+
+	-- 5) Deduct credits
+	PlayerData["leaderstats"]["Credits"] -= Price
+
+	-- 6) Add target to inventory
+	PlayerData["Inventory"]["TargetInventory"][NextTarget] = true
+	Data.Set(Player, PlayerData)
+
+	-- 7) Set the new target as active (this fires SetTargetEvent to all clients)
+	PlayerPlotManagers[Player.Name]:SetTarget(NextTarget)
+
+	-- 8) Calculate the next-next target for client display update
+	local NextNextTarget = SETTINGS.TARGET_ORDER[CurrentIndex + 2]
+
+	return "Purchased", NextNextTarget
 end
 
 local function PurchaseSoldier(Player: Player, Type: string)
@@ -312,7 +349,16 @@ DeactivateSoldierFunction.OnServerInvoke = function(Player: Player, SoldierID: s
 end
 
 UpdateSettingFunction.OnServerInvoke = function(Player: Player, Item: string)
-    local Arg1, Arg2, Arg3 = UpdateSetting(Player, Item)
+	local Arg1, Arg2, Arg3 = UpdateSetting(Player, Item)
 
-    return Arg1, Arg2, Arg3
+	return Arg1, Arg2, Arg3
 end
+
+UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)
+	local Response, NextNextTarget = PurchaseTarget(Player)
+
+	if Response == "Purchased" then
+		-- Fire back to client with next target to display (or nil if complete)
+		UpgradeTargetEvent:FireClient(Player, NextNextTarget)
+	end
+end)
