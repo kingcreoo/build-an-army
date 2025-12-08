@@ -5,7 +5,7 @@ local SETTINGS = {}
 
 SETTINGS.DEFAULT_DATA = {
     ["leaderstats"] = {
-        ["Credits"] = 100
+        ["Credits"] = 1000
     },
     ["Plot"] = {
         ["Unlocks"] = {

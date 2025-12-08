@@ -360,5 +360,11 @@ UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)
 	if Response == "Purchased" then
 		-- Fire back to client with next target to display (or nil if complete)
 		UpgradeTargetEvent:FireClient(Player, NextNextTarget)
+	elseif Response == "Insufficient" then
+		-- Fire error response back to client
+		UpgradeTargetEvent:FireClient(Player, "Insufficient")
+	elseif Response == "Complete" then
+		-- Fire completion status back to client
+		UpgradeTargetEvent:FireClient(Player, "Complete")
 	end
 end)

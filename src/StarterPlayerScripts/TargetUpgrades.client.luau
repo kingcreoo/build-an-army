@@ -122,7 +122,7 @@ local function AttemptPurchase()
 
 	-- 2) Check if there's a next target to purchase
 	if not NextTargetType then
-		NotifyBindable:Fire("All targets unlocked!", 0.8, Color3.fromRGB(255, 255, 0))
+		NotifyBindable:Fire("All targets unlocked!", 0.8, Color3.fromRGB(255, 0, 0))
 		PurchaseDebounce = false
 		return
 	end
@@ -130,7 +130,7 @@ local function AttemptPurchase()
 	-- 3) Check if player has enough credits
 	local Price = SETTINGS.TARGET_DATA[NextTargetType].Price
 	if LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Credits").Value < Price then
-		NotifyBindable:Fire("Not enough credits!", 0.8, Color3.fromRGB(255, 0, 0))
+		NotifyBindable:Fire("Insufficient funds!", 0.8, Color3.fromRGB(255, 0, 0))
 		PurchaseDebounce = false
 		return
 	end
@@ -170,14 +170,25 @@ NoButton.MouseButton1Click:Connect(function()
 	CloseFrameBindable:Fire(UpgradeTargetFrame)
 end)
 
--- Server response after successful purchase - display next target and close frame
-UpgradeTargetEvent.OnClientEvent:Connect(function(NextTarget: string?)
-	-- Close the frame after successful purchase
+-- Server response after successful purchase or error
+UpgradeTargetEvent.OnClientEvent:Connect(function(Response: string?)
+	-- Handle error responses
+	if Response == "Insufficient" then
+		NotifyBindable:Fire("Insufficient funds!", 0.8, Color3.fromRGB(255, 0, 0))
+		PurchaseDebounce = false
+		return
+	elseif Response == "Complete" then
+		NotifyBindable:Fire("All targets unlocked!", 0.8, Color3.fromRGB(255, 255, 0))
+		PurchaseDebounce = false
+		return
+	end
+
+	-- Close the frame
 	CloseFrameBindable:Fire(UpgradeTargetFrame)
 
 	-- Update display for next target
-	if NextTarget then
-		DisplayTarget(NextTarget)
+	if Response then
+		DisplayTarget(Response)
 	else
 		DisplayComplete()
 	end
