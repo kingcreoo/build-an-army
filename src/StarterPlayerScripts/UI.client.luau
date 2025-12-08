@@ -23,6 +23,7 @@ local SoldierShopFrame: Frame = FramesGui:WaitForChild("SoldierShop")
 local SoldierInventoryFrame: Frame = FramesGui:WaitForChild("SoldierInventory")
 local SettingsFrame: Frame = FramesGui:WaitForChild("SettingsFrame")
 local UpgradeTargetFrame: Frame = FramesGui:WaitForChild("UpgradeTargetFrame")
+local SellSoldiersFrame: Frame = FramesGui:WaitForChild("SellSoldiersFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
@@ -33,8 +34,8 @@ local IdleRewardsClaimButton: TextButton = IdleRewardsFrame:WaitForChild("MainFr
 local NotificationFrame: Frame = FramesGui:WaitForChild("NotificationFrame")
 local TemplateNotification: TextLabel = NotificationFrame:WaitForChild("TemplateNotification")
 
-local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame}
-local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false}
+local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame}
+local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false}
 
 local HUDButtons = {SoldiersButton, StoreButton, SettingsButton}
 
@@ -53,6 +54,7 @@ local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
 
 local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
+local SellSoldiersPrompt: ProximityPrompt = Workspace:WaitForChild("SellSoldiers"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 
 local ActiveFrame = nil
 local ActiveFramePriority = nil
@@ -302,6 +304,22 @@ end)
 UpgradeShopPrompt.PromptHidden:Connect(function()
 	if UpgradeTargetFrame.Visible == false then return end
 	CloseFrame(UpgradeTargetFrame)
+end)
+
+SellSoldiersPrompt.PromptShown:Connect(function()
+	if PromptedFrameDebounces[SellSoldiersFrame] then return end
+
+	if SellSoldiersFrame.Visible == true then return end
+
+	PromptedFrameDebounces[SellSoldiersFrame] = true
+	OpenFrame(SellSoldiersFrame)
+
+	task.wait(.5)
+	PromptedFrameDebounces[SellSoldiersFrame] = false
+end)
+SellSoldiersPrompt.PromptHidden:Connect(function()
+	if SellSoldiersFrame.Visible == false then return end
+	CloseFrame(SellSoldiersFrame)
 end)
 
 NotifyBindable.Event:Connect(Notify)
