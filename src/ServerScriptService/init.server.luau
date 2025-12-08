@@ -33,6 +33,7 @@ local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSoldier")
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
+local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -310,6 +311,43 @@ local function UpdateSetting(Player: Player, Item: string)
     end
 end
 
+-- Processes a soldier sale request from a player
+local function SellSoldier(Player: Player, SoldierID: string)
+    -- 1) Get player data
+    local PlayerData = Data.Get(Player)
+
+    -- 2) Check soldier exists in inventory
+    local SoldierData = PlayerData["Inventory"]["SoldierInventory"][SoldierID]
+    if not SoldierData then
+        return "NotFound", nil
+    end
+
+    -- 3) Check soldier is not active
+    for _, ActiveID in pairs(PlayerData["Inventory"]["ActiveSoldiers"]) do
+        if ActiveID == SoldierID then
+            return "Active", nil
+        end
+    end
+
+    -- 4) Check soldier is not special
+    local SoldierType = SoldierData["Type"]
+    if SETTINGS.SOLDIER_DATA[SoldierType]["Special"] then
+        return "Special", nil
+    end
+
+    -- 5) Get sell value and add credits
+    local SellValue = SETTINGS.SOLDIER_DATA[SoldierType]["SellValue"]
+    PlayerData["leaderstats"]["Credits"] += SellValue
+
+    -- 6) Remove soldier from inventory
+    PlayerData["Inventory"]["SoldierInventory"][SoldierID] = nil
+
+    -- 7) Save data
+    Data.Set(Player, PlayerData)
+
+    return "Sold", PlayerData
+end
+
 -- // Events & Calling
 RewardLoop.Init()
 Players.PlayerAdded:Connect(OnPlayerAdded)
@@ -367,4 +405,9 @@ UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)
 		-- Fire completion status back to client
 		UpgradeTargetEvent:FireClient(Player, "Complete")
 	end
+end)
+
+SellSoldierEvent.OnServerEvent:Connect(function(Player: Player, SoldierID: string)
+	local Response, PlayerData = SellSoldier(Player, SoldierID)
+	SellSoldierEvent:FireClient(Player, Response, PlayerData)
 end)

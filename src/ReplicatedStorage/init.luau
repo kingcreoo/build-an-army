@@ -31,39 +31,45 @@ SETTINGS.DEFAULT_DATA = {
 }
 
 SETTINGS.SOLDIER_DATA = {
-    ["The Grunt"] = {
-        ["FireRate"] = 4,
-        ["Damage"] = 1,
-        ["BulletSpeed"] = 40,
-        ["Price"] = 10,
-        ["RobuxPrice"] = 3,
-        ["Rarity"] = 1,
-        ["Image"] = "rbxassetid://73900105861068",
-        ["Color"] = Color3.fromRGB(72, 157, 236),
-        ["Weapon"] = "M4"
-    },
-    ["The Shotgunner"] = {
-        ["FireRate"] = 4,
-        ["Damage"] = 1,
-        ["BulletSpeed"] = 40,
-        ["Price"] = 25,
-        ["RobuxPrice"] = 5,
-        ["Rarity"] = 1,
-        ["Image"] = "rbxassetid://73900105861068",
-        ["Color"] = Color3.fromRGB(72, 157, 236),
-        ["Weapon"] = "Pump"
-    },
-    ["The Heavy"] = {
-        ["FireRate"] = 4,
-        ["Damage"] = 1,
-        ["BulletSpeed"] = 40,
-        ["Price"] = 60,
-        ["RobuxPrice"] = 10,
-        ["Rarity"] = .9,
-        ["Image"] = "rbxassetid://73900105861068",
-        ["Color"] = Color3.fromRGB(72, 157, 236),
-        ["Weapon"] = "LMG"
-    }
+	["The Grunt"] = {
+		["FireRate"] = 4,
+		["Damage"] = 1,
+		["BulletSpeed"] = 40,
+		["Price"] = 10,
+		["RobuxPrice"] = 3,
+		["Rarity"] = 1,
+		["Image"] = "rbxassetid://73900105861068",
+		["Color"] = Color3.fromRGB(72, 157, 236),
+		["Weapon"] = "M4",
+		["SellValue"] = 5,
+		["Special"] = false
+	},
+	["The Shotgunner"] = {
+		["FireRate"] = 4,
+		["Damage"] = 1,
+		["BulletSpeed"] = 40,
+		["Price"] = 25,
+		["RobuxPrice"] = 5,
+		["Rarity"] = 1,
+		["Image"] = "rbxassetid://73900105861068",
+		["Color"] = Color3.fromRGB(72, 157, 236),
+		["Weapon"] = "Pump",
+		["SellValue"] = 12,
+		["Special"] = false
+	},
+	["The Heavy"] = {
+		["FireRate"] = 4,
+		["Damage"] = 1,
+		["BulletSpeed"] = 40,
+		["Price"] = 60,
+		["RobuxPrice"] = 10,
+		["Rarity"] = .9,
+		["Image"] = "rbxassetid://73900105861068",
+		["Color"] = Color3.fromRGB(72, 157, 236),
+		["Weapon"] = "LMG",
+		["SellValue"] = 30,
+		["Special"] = false
+	}
 }
 
 SETTINGS.SHOP_ORDER = {"The Grunt", "The Shotgunner", "The Heavy"}
