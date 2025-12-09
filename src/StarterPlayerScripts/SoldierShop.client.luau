@@ -254,7 +254,7 @@ local function InitializeStandardShop()
 
     task.spawn(UpdateTimer)
 
-    for Num, Type in pairs(SETTINGS.SHOP_ORDER) do
+    for Num, Type in ipairs(SETTINGS.SHOP_ORDER) do
         local Data = SETTINGS.SOLDIER_DATA[Type]
         local SoldierFrame = TemplateFrame:Clone()
         SoldierFrame.Name = tostring(Num+1) .. Type
