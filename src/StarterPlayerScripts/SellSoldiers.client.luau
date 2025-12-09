@@ -6,14 +6,23 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
+-- // CRITICAL: Connect to LoadPlayerEvent FIRST before any WaitForChild calls
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
+
+-- Cache player data if event fires before we finish initializing
+local CachedPlayerData = nil
+
+LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
+	CachedPlayerData = PlayerData
+end)
+
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
 
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
 local UpdateInventoryBindable: BindableEvent = Remotes:WaitForChild("UpdateInventory")
 
@@ -106,14 +115,12 @@ end
 local function HideConfirmation()
 	SelectedSoldierID = nil
 
+	-- Hide confirmation frame
+	ConfirmFrame.Visible = false
+
 	-- Tween main frame back to center
 	local SlideTween = TweenService:Create(SellSoldiersFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.5)})
 	SlideTween:Play()
-
-	-- Hide confirmation frame after SlideTween completes
-	SlideTween.Completed:Connect(function()
-		ConfirmFrame.Visible = false
-	end)
 end
 
 -- Creates a soldier frame in the sell list
@@ -244,6 +251,15 @@ local function InitializeInventory(PlayerData: table)
 	end
 end
 
+-- Processes player data (called from cached data or future events)
+local function ProcessPlayerData(PlayerData: table)
+	if LatestData == nil then
+		InitializeInventory(PlayerData)
+	else
+		UpdateInventory(PlayerData)
+	end
+end
+
 -- // Events
 
 -- Button hover effects
@@ -311,13 +327,14 @@ SellSoldierEvent.OnClientEvent:Connect(function(Response: string, PlayerData: ta
 	end
 end)
 
--- Player data events
+-- Handle future LoadPlayerEvent fires (reconnects, etc)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
-	if LatestData == nil then
-		InitializeInventory(PlayerData)
-	else
-		UpdateInventory(PlayerData)
-	end
+	ProcessPlayerData(PlayerData)
 end)
 
 UpdateInventoryBindable.Event:Connect(UpdateInventory)
+
+-- Process cached data if event fired before we finished initializing
+if CachedPlayerData then
+	ProcessPlayerData(CachedPlayerData)
+end

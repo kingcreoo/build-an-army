@@ -5,6 +5,17 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+-- // CRITICAL: Connect to LoadPlayerEvent FIRST before any WaitForChild calls
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
+
+-- Cache player data if event fires before we finish initializing
+local CachedPlayerData = nil
+
+LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
+	CachedPlayerData = PlayerData
+end)
+
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 
@@ -24,9 +35,6 @@ local Template = ScrollingFrame:WaitForChild("Template")
 
 local Buttons = {CloseButton, AutoEquipButton}
 
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
-
-local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSoldier")
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
 local UpdateSettingFunction: RemoteFunction = Remotes:WaitForChild("UpdateSetting")
@@ -242,6 +250,13 @@ local function InitializeInventory(PlayerData: table)
     end
 end
 
+-- Processes player data (called from cached data or future events)
+local function ProcessPlayerData(PlayerData: table)
+	LatestData = PlayerData
+	InitializeInventory(PlayerData)
+	UpdateAE(PlayerData.Settings.AutoEquip)
+end
+
 -- // Events
 
 for _, Button in pairs(Buttons) do
@@ -264,10 +279,9 @@ SoldierInventoryFrame:GetPropertyChangedSignal("Visible"):Connect(function()
     FrameActive = SoldierInventoryFrame.Visible
 end)
 
+-- Handle future LoadPlayerEvent fires (reconnects, etc)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
-    LatestData = PlayerData
-    InitializeInventory(PlayerData)
-    UpdateAE(PlayerData.Settings.AutoEquip)
+    ProcessPlayerData(PlayerData)
 end)
 
 AutoEquipButton.MouseButton1Click:Connect(ChangeAE)
@@ -275,3 +289,8 @@ AutoEquipButton.MouseButton1Click:Connect(ChangeAE)
 UpdateInventoryBindable.Event:Connect(UpdateInventory)
 ActivateBindable.Event:Connect(ActivateSoldier)
 DeactivateBindable.Event:Connect(DeactivateSoldier)
+
+-- Process cached data if event fired before we finished initializing
+if CachedPlayerData then
+	ProcessPlayerData(CachedPlayerData)
+end
