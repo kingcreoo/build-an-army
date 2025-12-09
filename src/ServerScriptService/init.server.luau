@@ -34,6 +34,7 @@ local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSo
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
+local UnlockSlotEvent: RemoteEvent = Remotes:WaitForChild("UnlockSlot")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -348,6 +349,55 @@ local function SellSoldier(Player: Player, SoldierID: string)
     return "Sold", PlayerData
 end
 
+-- Processes a slot unlock request from a player
+local function UnlockSlot(Player: Player)
+    -- 1) Get player data
+    local PlayerData = Data.Get(Player)
+
+    -- 2) Find next slot to unlock (4, 5, or 6)
+    local NextSlot = nil
+    for i = 4, 6 do
+        if not PlayerData.Plot.Unlocks["Slot" .. i] then
+            NextSlot = i
+            break
+        end
+    end
+
+    -- 3) If no next slot (all unlocked), return MaxSlots
+    if not NextSlot then
+        return "MaxSlots", nil
+    end
+
+    -- 4) Get price from SETTINGS
+    local Price = SETTINGS.SLOT_PRICES[NextSlot]
+
+    -- 5) If price is "VIP", return VIPRequired
+    if Price == "VIP" then
+        -- TODO: Integrate with gamepass check for slot 7
+        return "VIPRequired", nil
+    end
+
+    -- 6) Check player has sufficient funds
+    if PlayerData["leaderstats"]["Credits"] < Price then
+        return "Insufficient", nil
+    end
+
+    -- 7) Deduct credits
+    PlayerData["leaderstats"]["Credits"] -= Price
+
+    -- 8) Unlock the slot
+    PlayerData.Plot.Unlocks["Slot" .. NextSlot] = true
+
+    -- 9) Save data
+    Data.Set(Player, PlayerData)
+
+    -- 10) Refresh targets to spawn target in newly unlocked slot
+    local ActiveTarget = PlayerData.Inventory.ActiveTarget
+    PlayerPlotManagers[Player.Name]:SetTarget(ActiveTarget)
+
+    return "Unlocked", PlayerData
+end
+
 -- // Events & Calling
 RewardLoop.Init()
 Players.PlayerAdded:Connect(OnPlayerAdded)
@@ -410,4 +460,9 @@ end)
 SellSoldierEvent.OnServerEvent:Connect(function(Player: Player, SoldierID: string)
 	local Response, PlayerData = SellSoldier(Player, SoldierID)
 	SellSoldierEvent:FireClient(Player, Response, PlayerData)
+end)
+
+UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
+	local Response, PlayerData = UnlockSlot(Player)
+	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
 end)

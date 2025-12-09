@@ -5,13 +5,13 @@ local SETTINGS = {}
 
 SETTINGS.DEFAULT_DATA = {
     ["leaderstats"] = {
-        ["Credits"] = 1000
+        ["Credits"] = 100000000
     },
     ["Plot"] = {
         ["Unlocks"] = {
             ["Slot1"] = true,
             ["Slot2"] = true,
-            ["Slot3"] = false,
+            ["Slot3"] = true,
             ["Slot4"] = false,
             ["Slot5"] = false,
             ["Slot6"] = false,
@@ -120,10 +120,9 @@ SETTINGS.TARGET_ORDER = {
 }
 
 SETTINGS.SLOT_PRICES = {
-    [3] = 1000,
-    [4] = 10000,
-    [5] = 25000,
-    [6] = 25000,
+    [4] = 20000,
+    [5] = 100000,
+    [6] = 1000000,
     [7] = "VIP"
 }
 

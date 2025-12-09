@@ -24,6 +24,7 @@ local SoldierInventoryFrame: Frame = FramesGui:WaitForChild("SoldierInventory")
 local SettingsFrame: Frame = FramesGui:WaitForChild("SettingsFrame")
 local UpgradeTargetFrame: Frame = FramesGui:WaitForChild("UpgradeTargetFrame")
 local SellSoldiersFrame: Frame = FramesGui:WaitForChild("SellSoldiersFrame")
+local UnlockSlotFrame: Frame = FramesGui:WaitForChild("UnlockSlotFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
@@ -34,8 +35,8 @@ local IdleRewardsClaimButton: TextButton = IdleRewardsFrame:WaitForChild("MainFr
 local NotificationFrame: Frame = FramesGui:WaitForChild("NotificationFrame")
 local TemplateNotification: TextLabel = NotificationFrame:WaitForChild("TemplateNotification")
 
-local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame}
-local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false}
+local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame, UnlockSlotFrame}
+local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false, UnlockSlotFrame = false}
 
 local HUDButtons = {SoldiersButton, StoreButton, SettingsButton}
 
@@ -55,6 +56,7 @@ local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
 local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local SellSoldiersPrompt: ProximityPrompt = Workspace:WaitForChild("SellSoldiers"):WaitForChild("PromptPart"):WaitForChild("Prompt")
+local UnlockSlotsPrompt: ProximityPrompt = Workspace:WaitForChild("UnlockSlots"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 
 local ActiveFrame = nil
 local ActiveFramePriority = nil
@@ -320,6 +322,22 @@ end)
 SellSoldiersPrompt.PromptHidden:Connect(function()
 	if SellSoldiersFrame.Visible == false then return end
 	CloseFrame(SellSoldiersFrame)
+end)
+
+UnlockSlotsPrompt.PromptShown:Connect(function()
+	if PromptedFrameDebounces[UnlockSlotFrame] then return end
+
+	if UnlockSlotFrame.Visible == true then return end
+
+	PromptedFrameDebounces[UnlockSlotFrame] = true
+	OpenFrame(UnlockSlotFrame)
+
+	task.wait(.5)
+	PromptedFrameDebounces[UnlockSlotFrame] = false
+end)
+UnlockSlotsPrompt.PromptHidden:Connect(function()
+	if UnlockSlotFrame.Visible == false then return end
+	CloseFrame(UnlockSlotFrame)
 end)
 
 NotifyBindable.Event:Connect(Notify)
