@@ -242,7 +242,6 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     local BulletSpeed = WeaponInfo["BulletSpeed"]
 
     -- 3) Calculate common values
-    local FirePoint = SoldierModel:WaitForChild("Weapon"):WaitForChild("Fire").CFrame
     local TargetPosition = TargetModel.Target.Position
     local Distance = (Plot.Info.Target1.Position - Plot.Info.Slot1.Position).Magnitude
     local SoldierCFrame = SoldierModel:GetPrimaryPartCFrame()
@@ -250,6 +249,7 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     -- 4) Handle based on weapon type
     if WeaponType == "Shotgun" then
         -- Shotgun fires multiple pellets with random cone spread
+        local FirePoint = SoldierModel:WaitForChild("Weapon"):WaitForChild("Fire").CFrame
         local Pellets = WeaponInfo["Pellets"] or 5
         local MaxSpreadIntensity = WeaponInfo["SpreadIntensity"] or 3
 
@@ -260,8 +260,16 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
             Duration = AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, RandomSpreadAmount * 2)
         end
         return Duration
+    elseif WeaponType == "Dual" then
+        -- Dual fires from alternating fire points
+        local FirePointIndex = SoldierData.FirePointIndex or 1
+        local FirePointName = "Fire" .. FirePointIndex
+        local FirePoint = SoldierModel:WaitForChild("Weapon"):WaitForChild(FirePointName).CFrame
+        local SpreadIntensity = WeaponInfo["SpreadIntensity"] or 1
+        return AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, SpreadIntensity)
     else
         -- Automatic and Burst fire single bullets (burst handled server-side in RewardLoop.luau)
+        local FirePoint = SoldierModel:WaitForChild("Weapon"):WaitForChild("Fire").CFrame
         local SpreadIntensity = WeaponInfo["SpreadIntensity"] or 2
         return AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, SpreadIntensity)
     end

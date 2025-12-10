@@ -84,15 +84,37 @@ SETTINGS.SOLDIER_DATA = {
             ["DelayBetweenBullets"] = .2,
             ["SpreadIntensity"] = 1
         }
+	},
+    ["The Dual"] = {
+		["Price"] = 60,
+		["RobuxPrice"] = 10,
+		["Rarity"] = .9,
+		["Image"] = "rbxassetid://73900105861068",
+		["Color"] = Color3.fromRGB(72, 157, 236),
+		["Weapon"] = "DualM4",
+		["SellValue"] = 30,
+		["Special"] = false,
+        ["WeaponType"] = "Dual",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 2,
+		    ["Damage"] = 1,
+		    ["BulletSpeed"] = 30,
+            ["DelayBetweenBullets"] = .2,
+            ["SpreadIntensity"] = 1
+        }
 	}
 }
 
-SETTINGS.SHOP_ORDER = {"The Grunt", "The Shotgunner", "The Heavy"}
+SETTINGS.SHOP_ORDER = {"The Grunt", "The Shotgunner", "The Heavy", "The Dual"}
 
-SETTINGS.RATING_ORDER = {"The Heavy", "The Shotgunner", "The Grunt"}
+SETTINGS.RATING_ORDER = {"The Dual", "The Heavy", "The Shotgunner", "The Grunt"}
 
 SETTINGS.WEAPON_DATA = {
     ["M4"] = {
+        ["C0"] = CFrame.new(-0.697, -2.093, 0.167) * CFrame.Angles(math.rad(-90), 0, 0),
+        ["C1"] = CFrame.new(0, -0.062, -0.489)
+    },
+    ["DualM4"] = {
         ["C0"] = CFrame.new(-0.697, -2.093, 0.167) * CFrame.Angles(math.rad(-90), 0, 0),
         ["C1"] = CFrame.new(0, -0.062, -0.489)
     },

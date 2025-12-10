@@ -114,6 +114,17 @@ local function FireSoldiers(SoldiersToFire)
 					task.wait(WeaponInfo.DelayBetweenBullets)
 				end
 			end
+		elseif WeaponType == "Dual" then
+			-- Fire 2 bullets from alternating fire points
+			for i = 1, 2 do
+				InfoTable.SoldierData.FirePointIndex = i
+				FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
+				ApplyBulletDamage(InfoTable, WeaponInfo)
+
+				if i < 2 then
+					task.wait(WeaponInfo.DelayBetweenBullets)
+				end
+			end
 		else
 			-- Auto/Shotgun: fire once, client handles visuals
 			FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
