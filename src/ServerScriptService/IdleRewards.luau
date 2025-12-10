@@ -43,15 +43,16 @@ local function CalculateRewards(PlayerData: table, TimeAway: number)
 
         if SoldierData then
             local SoldierStats = Settings["SOLDIER_DATA"][SoldierData["Type"]]
+            local WeaponInfo = SoldierStats["WeaponInfo"]
 
             -- Calculate how many shots to kill the target
-            local ShotsToKill = math.ceil(TargetHealth / SoldierStats["Damage"])
+            local ShotsToKill = math.ceil(TargetHealth / WeaponInfo["Damage"])
 
             -- Time when the last bullet fires
-            local LastShotTime = (ShotsToKill - 1) * SoldierStats["FireRate"]
+            local LastShotTime = (ShotsToKill - 1) * WeaponInfo["FireRate"]
 
             -- Calculate travel time for last bullet
-            local TravelTime = Distance / SoldierStats["BulletSpeed"]
+            local TravelTime = Distance / WeaponInfo["BulletSpeed"]
 
             -- Calculate total kill cycle time
             local CycleTime = LastShotTime + TravelTime + TargetRespawnTime

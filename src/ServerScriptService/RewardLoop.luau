@@ -77,31 +77,49 @@ local function AddReward(InfoTable: table)
     end)
 end
 
+-- Applies damage and handles death/reward logic for a single bullet
+local function ApplyBulletDamage(InfoTable: table, WeaponInfo: table)
+	local Damage = WeaponInfo["Damage"]
+	local CurrentHealth = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
+
+	-- Set damage
+	Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].Health = CurrentHealth - Damage
+
+	-- If the target died, give rewards at the right time
+	if CurrentHealth - Damage <= 0 and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].State == "Alive" then
+		DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = true
+		local BulletSpeed = WeaponInfo["BulletSpeed"]
+		local TimeToHit = CalculateTimeToHit(Workspace.Plots:FindFirstChild(InfoTable.PlayerName), BulletSpeed)
+		task.delay(TimeToHit, function()
+			AddReward(InfoTable)
+			task.delay(SETTINGS["TARGET_DATA"][TargetTypes[InfoTable.PlayerName]]["TotalRespawnTime"], function()
+				DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = false
+			end)
+		end)
+	end
+end
+
 local function FireSoldiers(SoldiersToFire)
-    for _, InfoTable in pairs(SoldiersToFire) do
-        -- Fire local client
-        FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
+	for _, InfoTable in pairs(SoldiersToFire) do
+		local WeaponType = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponType"]
+		local WeaponInfo = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]
 
-        -- 1) Get stats
-        local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["Damage"]
-        local CurrentHealth = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
+		if WeaponType == "Burst" then
+			-- Fire multiple bullets with delays
+			for i = 1, WeaponInfo.Bullets do
+				FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
+				ApplyBulletDamage(InfoTable, WeaponInfo)
 
-        -- 2) Set damage
-        Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].Health = CurrentHealth - Damage
-
-        -- 3) If the target died, we give the rewards at the right time
-        if CurrentHealth - Damage <= 0 and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].State == "Alive" then
-            DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = true
-            local BulletSpeed = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["BulletSpeed"]
-            local TimeToHit = CalculateTimeToHit(Workspace.Plots:FindFirstChild(InfoTable.PlayerName), BulletSpeed)
-            task.delay(TimeToHit, function()
-                AddReward(InfoTable)
-                task.delay(SETTINGS["TARGET_DATA"][TargetTypes[InfoTable.PlayerName]]["TotalRespawnTime"], function()
-                    DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = false
-                end)
-            end)
-        end
-    end
+				if i < WeaponInfo.Bullets then
+					task.wait(WeaponInfo.DelayBetweenBullets)
+				end
+			end
+		else
+			-- Auto/Shotgun: fire once, client handles visuals
+			FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
+			ApplyBulletDamage(InfoTable, WeaponInfo)
+		end
+	end
 end
 
 local function SoldierPromise(PlayerName, SoldierID, SoldierData)
@@ -258,7 +276,7 @@ function RewardLoop.Init()
                 end
 
                 -- 1) Get soldier's base stats
-                local BaseFireRate = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["FireRate"]
+                local BaseFireRate = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponInfo"]["FireRate"]
 
                 -- 2) Get any boosts
                 -- TODO get boosts

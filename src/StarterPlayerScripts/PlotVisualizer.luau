@@ -64,7 +64,8 @@ local function ResetStatusBar(SoldierModel: Model, SoldierData: table)
     local StatusBar = SoldierModel:FindFirstChild("Head"):FindFirstChild("StatusBar")
     if not StatusBar then return end
 
-    local FireRate = SETTINGS.SOLDIER_DATA[SoldierData["Type"]]["FireRate"]
+    local WeaponInfo = SETTINGS.SOLDIER_DATA[SoldierData["Type"]]["WeaponInfo"]
+    local FireRate = WeaponInfo["FireRate"]
     if not FireRate then return end
 
     local ColorFrame: Frame = StatusBar:FindFirstChild("Color")
@@ -180,6 +181,47 @@ local function AnimateExplosion(Position)
     end)
 end
 
+-- Animates a single bullet/pellet from fire point to target
+local function AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, SpreadAmount)
+    -- 1) Create bullet from pool
+    local Bullet = EntityHandler:Create("StandardBullet")
+
+    -- 2) Position bullet at weapon fire point
+    Bullet.CFrame = FirePoint * CFrame.Angles(0, math.rad(90), 0)
+    Bullet.Parent = Workspace.Bullets
+
+    -- 3) Calculate tween duration
+    local Duration = Distance / BulletSpeed
+
+    -- 4) Add spread in soldier's local coordinate system
+    local RandomSpread = (math.random() - 0.5) * SpreadAmount
+    local RandomHeight = (math.random() - 0.5) * SpreadAmount
+
+    local RightDirection = SoldierCFrame.RightVector
+    local UpDirection = SoldierCFrame.UpVector
+
+    local FinalTargetPosition = TargetPosition + RightDirection * RandomSpread + UpDirection * RandomHeight
+
+    -- 5) Tween to target
+    local Tween = TweenService:Create(
+        Bullet,
+        TweenInfo.new(Duration, Enum.EasingStyle.Linear),
+        {Position = FinalTargetPosition}
+    )
+    Tween.Parent = Bullet
+    Tween:Play()
+
+    -- 6) Explosion and cleanup
+    task.delay(Duration, function()
+        AnimateExplosion(FinalTargetPosition)
+        Tween:Destroy()
+        Bullet.AssemblyLinearVelocity = Vector3.zero
+        EntityHandler:Recycle(Bullet)
+    end)
+
+    return Duration
+end
+
 local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     -- 1) Get soldier and target models
     local Plot = Workspace:WaitForChild("Plots"):WaitForChild(PlayerName)
@@ -194,57 +236,35 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
         return 0
     end
 
-    -- 2) Create bullet from pool
-    local Bullet = EntityHandler:Create("StandardBullet")
+    -- 2) Get weapon info
+    local WeaponInfo = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponInfo"]
+    local WeaponType = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponType"]
+    local BulletSpeed = WeaponInfo["BulletSpeed"]
 
-    -- 3) Position bullet at weapon fire point
+    -- 3) Calculate common values
     local FirePoint = SoldierModel:WaitForChild("Weapon"):WaitForChild("Fire").CFrame
-    Bullet.CFrame = FirePoint * CFrame.Angles(0, math.rad(90), 0)
-    Bullet.Parent = Workspace.Bullets
-
-    -- 4) Calculate tween duration (distance / speed)
     local TargetPosition = TargetModel.Target.Position
     local Distance = (Plot.Info.Target1.Position - Plot.Info.Slot1.Position).Magnitude
-    local BulletSpeed = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["BulletSpeed"]
-    local Duration = Distance / BulletSpeed
-
-    -- Add random spread in soldier's local coordinate system
-    local Spread = 2  -- studs of random variation
-    local RandomSpread = (math.random() - 0.5) * Spread
-    local RandomHeight = (math.random() - 0.5) * Spread
-
-    -- Get soldier's orientation for proper spread direction
     local SoldierCFrame = SoldierModel:GetPrimaryPartCFrame()
-    local RightDirection = SoldierCFrame.RightVector
-    local UpDirection = SoldierCFrame.UpVector
 
-    -- Apply spread relative to soldier's orientation
-    local FinalTargetPosition = TargetPosition + RightDirection * RandomSpread + UpDirection * RandomHeight
+    -- 4) Handle based on weapon type
+    if WeaponType == "Shotgun" then
+        -- Shotgun fires multiple pellets with random cone spread
+        local Pellets = WeaponInfo["Pellets"] or 5
+        local MaxSpreadIntensity = WeaponInfo["SpreadIntensity"] or 3
 
-    -- 6) Tween to target
-    local Tween = TweenService:Create(
-        Bullet,
-        TweenInfo.new(Duration, Enum.EasingStyle.Linear),
-        {Position = FinalTargetPosition}
-    )
-    Tween.Parent = Bullet
-
-    Tween:Play()
-
-    -- 7) Explosions and cleanup
-    task.delay(Duration, function()
-        -- Explosion
-        AnimateExplosion(FinalTargetPosition)
-
-        -- Destroy tween
-        Tween:Destroy()
-        Bullet.AssemblyLinearVelocity = Vector3.zero
-
-        -- Recycle bullet
-        EntityHandler:Recycle(Bullet)
-    end)
-
-    return Duration
+        local Duration = 0
+        for _ = 1, Pellets do
+            -- Each pellet gets random spread between 1 and SpreadIntensity
+            local RandomSpreadAmount = math.random() * (MaxSpreadIntensity - 1) + 1
+            Duration = AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, RandomSpreadAmount * 2)
+        end
+        return Duration
+    else
+        -- Automatic and Burst fire single bullets (burst handled server-side in RewardLoop.luau)
+        local SpreadIntensity = WeaponInfo["SpreadIntensity"] or 2
+        return AnimateSingleBullet(FirePoint, TargetPosition, Distance, BulletSpeed, SoldierCFrame, SpreadIntensity)
+    end
 end
 
 local function DestroyTarget(InfoTable: table)
@@ -317,7 +337,7 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
 
         -- 3) If death, then animate & respawn target
         -- TODO target death animations
-        local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["Damage"]
+        local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]["Damage"]
         local CurrentHealth = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
 
         Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].Health = CurrentHealth - Damage
@@ -380,7 +400,7 @@ RunService.Heartbeat:Connect(function()
             end
 
             -- 1) Get soldier's base stats
-            local BaseFireRate = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["FireRate"]
+            local BaseFireRate = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponInfo"]["FireRate"]
 
             -- 2) Get any boosts
             -- TODO get boosts

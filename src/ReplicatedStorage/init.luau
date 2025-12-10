@@ -32,9 +32,6 @@ SETTINGS.DEFAULT_DATA = {
 
 SETTINGS.SOLDIER_DATA = {
 	["The Grunt"] = {
-		["FireRate"] = 4,
-		["Damage"] = 1,
-		["BulletSpeed"] = 40,
 		["Price"] = 10,
 		["RobuxPrice"] = 3,
 		["Rarity"] = 1,
@@ -42,12 +39,16 @@ SETTINGS.SOLDIER_DATA = {
 		["Color"] = Color3.fromRGB(72, 157, 236),
 		["Weapon"] = "M4",
 		["SellValue"] = 5,
-		["Special"] = false
+		["Special"] = false,
+        ["WeaponType"] = "Automatic",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 4,
+		    ["Damage"] = 1,
+		    ["BulletSpeed"] = 40,
+            ["SpreadIntensity"] = 1.5
+        }
 	},
 	["The Shotgunner"] = {
-		["FireRate"] = 4,
-		["Damage"] = 1,
-		["BulletSpeed"] = 40,
 		["Price"] = 25,
 		["RobuxPrice"] = 5,
 		["Rarity"] = 1,
@@ -55,12 +56,17 @@ SETTINGS.SOLDIER_DATA = {
 		["Color"] = Color3.fromRGB(72, 157, 236),
 		["Weapon"] = "Pump",
 		["SellValue"] = 12,
-		["Special"] = false
+		["Special"] = false,
+        ["WeaponType"] = "Shotgun",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 8,
+		    ["Damage"] = 3,
+		    ["BulletSpeed"] = 40,
+            ["Pellets"] = 5,
+            ["SpreadIntensity"] = 2.5
+        }
 	},
 	["The Heavy"] = {
-		["FireRate"] = 4,
-		["Damage"] = 1,
-		["BulletSpeed"] = 40,
 		["Price"] = 60,
 		["RobuxPrice"] = 10,
 		["Rarity"] = .9,
@@ -68,7 +74,16 @@ SETTINGS.SOLDIER_DATA = {
 		["Color"] = Color3.fromRGB(72, 157, 236),
 		["Weapon"] = "LMG",
 		["SellValue"] = 30,
-		["Special"] = false
+		["Special"] = false,
+        ["WeaponType"] = "Burst",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 3,
+		    ["Damage"] = 1,
+		    ["BulletSpeed"] = 30,
+            ["Bullets"] = 3,
+            ["DelayBetweenBullets"] = .2,
+            ["SpreadIntensity"] = 1
+        }
 	}
 }
 
