@@ -107,8 +107,19 @@ local function FireSoldiers(SoldiersToFire)
 		if WeaponType == "Burst" then
 			-- Fire multiple bullets with delays
 			for i = 1, WeaponInfo.Bullets do
+				-- Check if target already dead from previous bullet
+				local TargetData = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]
+				local IsNullBullet = TargetData.State ~= "Alive" or DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] == true
+				InfoTable.SoldierData.NullBullet = IsNullBullet
+				
+				-- Send current target health to client for sync
+				InfoTable.SoldierData.TargetHealth = TargetData.Health
+
 				FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
-				ApplyBulletDamage(InfoTable, WeaponInfo)
+
+				if not IsNullBullet then
+					ApplyBulletDamage(InfoTable, WeaponInfo)
+				end
 
 				if i < WeaponInfo.Bullets then
 					task.wait(WeaponInfo.DelayBetweenBullets)
@@ -118,8 +129,20 @@ local function FireSoldiers(SoldiersToFire)
 			-- Fire 2 bullets from alternating fire points
 			for i = 1, 2 do
 				InfoTable.SoldierData.FirePointIndex = i
+
+				-- Check if target already dead from previous bullet
+				local TargetData = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]
+				local IsNullBullet = TargetData.State ~= "Alive" or DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] == true
+				InfoTable.SoldierData.NullBullet = IsNullBullet
+				
+				-- Send current target health to client for sync
+				InfoTable.SoldierData.TargetHealth = TargetData.Health
+
 				FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
-				ApplyBulletDamage(InfoTable, WeaponInfo)
+
+				if not IsNullBullet then
+					ApplyBulletDamage(InfoTable, WeaponInfo)
+				end
 
 				if i < 2 then
 					task.wait(WeaponInfo.DelayBetweenBullets)
@@ -127,6 +150,9 @@ local function FireSoldiers(SoldiersToFire)
 			end
 		else
 			-- Auto/Shotgun: fire once, client handles visuals
+			local TargetData = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]
+			InfoTable.SoldierData.TargetHealth = TargetData.Health
+			
 			FireSoldierEvent:FireClient(Players:FindFirstChild(InfoTable.PlayerName), InfoTable)
 			ApplyBulletDamage(InfoTable, WeaponInfo)
 		end

@@ -340,13 +340,19 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
             ResetStatusBar(SoldierModel, InfoTable.SoldierData)
         end
 
-        -- 2) Create, Calculate, and Animate bullet
+        -- 3) Animate bullet (always animate, even null bullets)
         local TimeToHit = AnimateBullet(InfoTable.PlayerName, InfoTable.SoldierID, InfoTable.SoldierData, InfoTable.SoldierData.Slot)
 
-        -- 3) If death, then animate & respawn target
-        -- TODO target death animations
+        -- 4) Skip health bar logic for null bullets
+        if InfoTable.SoldierData.NullBullet then
+            continue
+        end
+
+        -- 5) Health bar logic (only for non-null bullets)
         local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]["Damage"]
-        local CurrentHealth = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
+        
+        -- Use server's target health for sync (server is source of truth)
+        local CurrentHealth = InfoTable.SoldierData.TargetHealth or Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
 
         Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].Health = CurrentHealth - Damage
 
