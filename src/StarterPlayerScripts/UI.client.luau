@@ -57,6 +57,8 @@ local ButtonDeflateBindable: BindableEvent = Remotes:WaitForChild("ButtonDeflate
 local CloseFrameBindable: BindableEvent = Remotes:WaitForChild("CloseFrame")
 local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
 local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
+local OpenStoreBindable: BindableEvent = Remotes:WaitForChild("OpenStoreBindable")
+local HUDBindable: BindableEvent = Remotes:WaitForChild("HUDBindable")
 
 local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
@@ -277,9 +279,36 @@ SettingsButton.MouseButton1Click:Connect(function()
     SettingsDB = false
 end)
 
+-- Credits button opens store with Credits pane
+CreditsButton.MouseButton1Click:Connect(function()
+    if not HUDActive then return end
+    OpenStoreBindable:Fire("Credits")
+end)
+
+-- Store button opens store with Passes pane
+StoreButton.MouseButton1Click:Connect(function()
+    if not HUDActive then return end
+    OpenStoreBindable:Fire("Passes")
+end)
+
+-- AdContainer button opens store with Passes pane
+local AdContainerButton = AdContainer:WaitForChild("Button")
+AdContainerButton.MouseButton1Click:Connect(function()
+    if not HUDActive then return end
+    OpenStoreBindable:Fire("Passes")
+end)
+
 ButtonExpandBindable.Event:Connect(ButtonExpand)
 ButtonDeflateBindable.Event:Connect(ButtonDeflate)
 CloseFrameBindable.Event:Connect(CloseFrame)
+
+HUDBindable.Event:Connect(function(Action: string)
+	if Action == "Close" then
+		CloseHUD(false)
+	elseif Action == "Open" then
+		OpenHUD(false)
+	end
+end)
 
 SoldierShopPrompt.PromptShown:Connect(function()
     if PromptedFrameDebounces[SoldierShopFrame] then return end
