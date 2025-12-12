@@ -19,9 +19,11 @@ end)
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = nil
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
 local UpdateInventoryBindable: BindableEvent = Remotes:WaitForChild("UpdateInventory")
@@ -288,15 +290,20 @@ end)
 -- Close button
 CloseButton.MouseButton1Click:Connect(function()
 	if FrameActive == false then return end
+	SOUND_MANAGER:PlayClick()
 	CloseFrameBindable:Fire(SellSoldiersFrame)
 end)
 
 -- Yes button - confirm sale
-YesButton.MouseButton1Click:Connect(AttemptSell)
+YesButton.MouseButton1Click:Connect(function()
+	SOUND_MANAGER:PlayClick()
+	AttemptSell()
+end)
 
 -- No button - cancel and return to main view
 NoButton.MouseButton1Click:Connect(function()
 	if not SelectedSoldierID then return end
+	SOUND_MANAGER:PlayClick()
 	HideConfirmation()
 end)
 

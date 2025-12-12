@@ -19,9 +19,11 @@ end)
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = nil
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local UnlockSlotEvent: RemoteEvent = Remotes:WaitForChild("UnlockSlot")
 
@@ -174,11 +176,15 @@ UnlockSlotFrame:GetPropertyChangedSignal("Visible"):Connect(function()
 end)
 
 -- Yes button - attempt purchase
-YesButton.MouseButton1Click:Connect(AttemptPurchase)
+YesButton.MouseButton1Click:Connect(function()
+	SOUND_MANAGER:PlayClick()
+	AttemptPurchase()
+end)
 
 -- No button - close frame
 NoButton.MouseButton1Click:Connect(function()
 	if FrameActive == false then return end
+	SOUND_MANAGER:PlayClick()
 	CloseFrameBindable:Fire(UnlockSlotFrame)
 end)
 
@@ -188,6 +194,7 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 	
 	if Response == "Unlocked" and PlayerData then
 		-- Successful unlock
+		SOUND_MANAGER:PlayPurchase()
 		NotifyBindable:Fire("Slot " .. NextSlotToUnlock .. " unlocked!", 0.8, Color3.fromRGB(0, 255, 0))
 		LatestData = PlayerData
 		

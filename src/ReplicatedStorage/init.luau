@@ -173,4 +173,19 @@ SETTINGS.DISTANCES = {
     }
 }
 
+SETTINGS.SOUNDS = {
+    UI = {
+        Click = "rbxassetid://6324790483"
+    },
+    Purchase = {
+        Buy = "rbxassetid://14621507602"
+    },
+    Error = {
+        Alert = "rbxassetid://3779045779"
+    },
+    Combat = {
+        Hitmarker = "rbxassetid://1129547534"
+    }
+}
+
 return SETTINGS

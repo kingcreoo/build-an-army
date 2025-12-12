@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
+local SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local FramesGui: ScreenGui = LocalGui:WaitForChild("Frames")
@@ -263,32 +264,38 @@ PassesPane.Visible = false
 -- Internal button clicks (switch panes)
 CreditsButton.MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	SwitchPane(CreditsButton)
 end)
 
 SoldiersButton.MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	SwitchPane(SoldiersButton)
 end)
 
 PassesButton.MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	SwitchPane(PassesButton)
 end)
 
 -- Close buttons (close entire store)
 CreditsPane:WaitForChild("Close").MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	CloseStore()
 end)
 
 SoldierPane:WaitForChild("Close").MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	CloseStore()
 end)
 
 PassesPane:WaitForChild("Close").MouseButton1Click:Connect(function()
 	if not StoreFrameActive then return end
+	SOUND_MANAGER:PlayClick()
 	CloseStore()
 end)
 

@@ -8,9 +8,11 @@ local TweenService = game:GetService("TweenService")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = nil
 
 -- // Variables
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local GetStockFunction: RemoteFunction = Remotes:WaitForChild("GetStock")
 local RestockEvent: RemoteEvent = Remotes:WaitForChild("Restock")
 local PurchaseSoldierFunction: RemoteFunction = Remotes:WaitForChild("PurchaseSoldier")
@@ -94,10 +96,13 @@ local function PressCreditsButton(SoldierFrame: Frame, Type: string)
     -- 4) Invoke server, and await response
     local Response, PlayerData = PurchaseSoldierFunction:InvokeServer(Type)
 
-    -- 5) Act on various response types
-    if Response == "Purchased" then
-        -- 1) Update stock
-        CurrentStock[Type] -= 1
+	-- 5) Act on various response types
+	if Response == "Purchased" then
+		-- Play purchase sound
+		SOUND_MANAGER:PlayPurchase()
+
+		-- 1) Update stock
+		CurrentStock[Type] -= 1
         if CurrentStock[Type] <= 0 then
             local Stock: TextLabel = SoldierFrame:WaitForChild("MainFrame"):WaitForChild("Stock")
             local CreditsButton: TextButton = SoldierFrame:WaitForChild("UtilityFrame"):WaitForChild("Credits")
@@ -277,28 +282,40 @@ local function InitializeStandardShop()
 
         SoldierFrame.Parent = StandardFrame:WaitForChild("ScrollingFrame")
 
-        local Debounce = false
-        local Mode = 0
-        local UtilityButton = SoldierFrame:WaitForChild("UtilityButton")
-        UtilityButton.MouseButton1Click:Connect(function()
-            if Debounce then return end
-            Debounce = true
+		local Debounce = false
+		local Mode = 0
+		local UtilityButton = SoldierFrame:WaitForChild("UtilityButton")
+		UtilityButton.MouseButton1Click:Connect(function()
+			if Debounce then return end
+			Debounce = true
 
-            if Mode == 0 then
-                EnterUtilityMode(SoldierFrame, MainFrame, UtilityFrame, UtilityButton)
-                Mode = 1
-            elseif Mode == 1 then
-                ExitUtilityMode(SoldierFrame, MainFrame, UtilityFrame, UtilityButton)
-                Mode = 0
-            end
+			SOUND_MANAGER:PlayClick()
 
-            task.wait(.1)
-            Debounce = false
-        end)
+			if Mode == 0 then
+				EnterUtilityMode(SoldierFrame, MainFrame, UtilityFrame, UtilityButton)
+				Mode = 1
+			elseif Mode == 1 then
+				ExitUtilityMode(SoldierFrame, MainFrame, UtilityFrame, UtilityButton)
+				Mode = 0
+			end
+
+			task.wait(.1)
+			Debounce = false
+		end)
 
         CreditsButton.MouseButton1Click:Connect(function()
             PressCreditsButton(SoldierFrame, Type)
         end)
+
+		RobuxButton.MouseButton1Click:Connect(function()
+			SOUND_MANAGER:PlayClick()
+			-- TODO: Implement Robux purchase logic
+		end)
+
+		GiftButton.MouseButton1Click:Connect(function()
+			SOUND_MANAGER:PlayClick()
+			-- TODO: Implement Gift logic
+		end)
 
         table.insert(Buttons, CreditsButton)
         table.insert(Buttons, RobuxButton)
@@ -310,8 +327,9 @@ end
 
 -- // Events
 CloseButton.MouseButton1Click:Connect(function()
-    if FrameActive == false then return end
-    CloseFrameBindable:Fire(SoldierShopFrame)
+	if FrameActive == false then return end
+	SOUND_MANAGER:PlayClick()
+	CloseFrameBindable:Fire(SoldierShopFrame)
 end)
 
 SoldierShopFrame:GetPropertyChangedSignal("Visible"):Connect(function()

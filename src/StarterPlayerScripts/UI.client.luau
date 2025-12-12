@@ -7,10 +7,9 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- // Modules
-
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
+local SOUND_MANAGER = nil
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local HUD: ScreenGui = LocalGui:WaitForChild("HUD")
@@ -51,6 +50,7 @@ local OpenTweenInfo = TweenInfo.new(.3, Enum.EasingStyle.Quad, Enum.EasingDirect
 local CloseTweenInfo = TweenInfo.new(.1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local ButtonExpandBindable: BindableEvent = Remotes:WaitForChild("ButtonExpand")
 local ButtonDeflateBindable: BindableEvent = Remotes:WaitForChild("ButtonDeflate")
@@ -176,23 +176,28 @@ local function OpenFrame(Frame: Frame)
 end
 
 local function Notify(Message: string, Time: number, Color: Color3Value)
-    local Notification = TemplateNotification:Clone()
-    Notification.Text = Message
-    Notification.TextColor3 = Color
-    Notification.LayoutOrder = 1
-    Notification.Visible = true
-    Notification.Parent = NotificationFrame
+	local Notification = TemplateNotification:Clone()
+	Notification.Text = Message
+	Notification.TextColor3 = Color
+	Notification.LayoutOrder = 1
+	Notification.Visible = true
+	Notification.Parent = NotificationFrame
 
-    task.delay(Time, function()
-        local FadeTween1 = TweenService:Create(Notification, TweenInfo.new(.4), {TextTransparency = 1})
-        FadeTween1:Play()
-        local FadeTween2 = TweenService:Create(Notification:WaitForChild("UIStroke"), TweenInfo.new(.4), {Transparency = 1})
-        FadeTween2:Play()
+	-- Play error sound if notification is red (error)
+	if Color == Color3.fromRGB(255, 0, 0) then
+		SOUND_MANAGER:PlayError()
+	end
 
-        FadeTween2.Completed:Connect(function()
-            Notification:Destroy()
-        end)
-    end)
+	task.delay(Time, function()
+		local FadeTween1 = TweenService:Create(Notification, TweenInfo.new(.4), {TextTransparency = 1})
+		FadeTween1:Play()
+		local FadeTween2 = TweenService:Create(Notification:WaitForChild("UIStroke"), TweenInfo.new(.4), {Transparency = 1})
+		FadeTween2:Play()
+
+		FadeTween2.Completed:Connect(function()
+			Notification:Destroy()
+		end)
+	end)
 end
 
 local function FormatHoursFromSeconds(Seconds: number)
@@ -247,55 +252,62 @@ for _, Button in pairs(HUDButtons) do
 end
 
 SoldiersButton.MouseButton1Click:Connect(function()
-    if not HUDActive then return end
+	if not HUDActive then return end
 
-    if SBD then return end
-    SBD = true
+	if SBD then return end
+	SBD = true
 
-    if ActiveFrame == SoldierInventoryFrame then
-        CloseFrame(SoldierInventoryFrame)
-    else
-        OpenFrame(SoldierInventoryFrame)
-    end
+	SOUND_MANAGER:PlayClick()
 
-    task.wait(.5)
-    SBD = false
+	if ActiveFrame == SoldierInventoryFrame then
+		CloseFrame(SoldierInventoryFrame)
+	else
+		OpenFrame(SoldierInventoryFrame)
+	end
+
+	task.wait(.5)
+	SBD = false
 end)
 
 local SettingsDB = false
 SettingsButton.MouseButton1Click:Connect(function()
-    if not HUDActive then return end
+	if not HUDActive then return end
 
-    if SettingsDB then return end
-    SettingsDB = true
+	if SettingsDB then return end
+	SettingsDB = true
 
-    if ActiveFrame == SettingsDB then
-        CloseFrame(SettingsFrame)
-    else
-        OpenFrame(SettingsFrame)
-    end
+	SOUND_MANAGER:PlayClick()
 
-    task.wait(.5)
-    SettingsDB = false
+	if ActiveFrame == SettingsDB then
+		CloseFrame(SettingsFrame)
+	else
+		OpenFrame(SettingsFrame)
+	end
+
+	task.wait(.5)
+	SettingsDB = false
 end)
 
 -- Credits button opens store with Credits pane
 CreditsButton.MouseButton1Click:Connect(function()
-    if not HUDActive then return end
-    OpenStoreBindable:Fire("Credits")
+	if not HUDActive then return end
+	SOUND_MANAGER:PlayClick()
+	OpenStoreBindable:Fire("Credits")
 end)
 
 -- Store button opens store with Passes pane
 StoreButton.MouseButton1Click:Connect(function()
-    if not HUDActive then return end
-    OpenStoreBindable:Fire("Passes")
+	if not HUDActive then return end
+	SOUND_MANAGER:PlayClick()
+	OpenStoreBindable:Fire("Passes")
 end)
 
 -- AdContainer button opens store with Passes pane
 local AdContainerButton = AdContainer:WaitForChild("Button")
 AdContainerButton.MouseButton1Click:Connect(function()
-    if not HUDActive then return end
-    OpenStoreBindable:Fire("Passes")
+	if not HUDActive then return end
+	SOUND_MANAGER:PlayClick()
+	OpenStoreBindable:Fire("Passes")
 end)
 
 ButtonExpandBindable.Event:Connect(ButtonExpand)

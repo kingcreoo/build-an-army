@@ -14,6 +14,7 @@ local TweenService = game:GetService("TweenService")
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 local EntityHandlerModule = require(script.Parent.EntityHandler)
+local SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 -- // Variables
 local Lanes = {[Players.LocalPlayer.Name] = {}}
@@ -174,6 +175,9 @@ local function AnimateExplosion(Position)
     local ParticleEmitter = Explosion:FindFirstChild("ParticleEmitter")
     ParticleEmitter.Color = ColorSequence.new(Color3.fromRGB(255, 70, 70))
     ParticleEmitter:Emit(8)
+
+    -- Play hitmarker sound
+    SOUND_MANAGER:PlayHitmarker(Position)
 
     -- Cleanup explosion after 1 second
     task.delay(1, function()

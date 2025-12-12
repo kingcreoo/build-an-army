@@ -8,12 +8,14 @@ local Workspace = game:GetService("Workspace")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = nil
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
 
 -- Connect to remotes FIRST to avoid race condition
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 
@@ -162,11 +164,15 @@ UpgradeTargetFrame:GetPropertyChangedSignal("Visible"):Connect(function()
 end)
 
 -- Yes button - attempt purchase
-YesButton.MouseButton1Click:Connect(AttemptPurchase)
+YesButton.MouseButton1Click:Connect(function()
+	SOUND_MANAGER:PlayClick()
+	AttemptPurchase()
+end)
 
 -- No button - close frame
 NoButton.MouseButton1Click:Connect(function()
 	if FrameActive == false then return end
+	SOUND_MANAGER:PlayClick()
 	CloseFrameBindable:Fire(UpgradeTargetFrame)
 end)
 
@@ -182,6 +188,9 @@ UpgradeTargetEvent.OnClientEvent:Connect(function(Response: string?)
 		PurchaseDebounce = false
 		return
 	end
+
+	-- Play purchase sound on success
+	SOUND_MANAGER:PlayPurchase()
 
 	-- Close the frame
 	CloseFrameBindable:Fire(UpgradeTargetFrame)

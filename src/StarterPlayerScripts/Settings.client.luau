@@ -7,9 +7,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = nil
 
 -- // Variables
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local UpdateSettingFunction: RemoteFunction = Remotes:WaitForChild("UpdateSetting")
@@ -122,16 +124,19 @@ SettingsFrame:GetPropertyChangedSignal("Visible"):Connect(function()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
-    if FrameActive == false then return end
-    CloseFrameBindable:Fire(SettingsFrame)
+	if FrameActive == false then return end
+	SOUND_MANAGER:PlayClick()
+	CloseFrameBindable:Fire(SettingsFrame)
 end)
 
 AEButton.MouseButton1Click:Connect(function()
-    ChangeSetting("AutoEquip")
+	SOUND_MANAGER:PlayClick()
+	ChangeSetting("AutoEquip")
 end)
 
 PMButton.MouseButton1Click:Connect(function()
-    ChangeSetting("PotatoMode")
+	SOUND_MANAGER:PlayClick()
+	ChangeSetting("PotatoMode")
 end)
 
 LoadPlayerEvent.OnClientEvent:Connect(LoadSettings)
