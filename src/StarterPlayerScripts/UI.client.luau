@@ -17,6 +17,9 @@ local HUD: ScreenGui = LocalGui:WaitForChild("HUD")
 local SoldiersButton: TextButton = HUD:WaitForChild("Soldiers")
 local StoreButton: TextButton = HUD:WaitForChild("Store")
 local SettingsButton: TextButton = HUD:WaitForChild("Settings")
+local CreditsButton: TextButton = HUD:WaitForChild("CreditsButton")
+local CreditsText: TextLabel = HUD:WaitForChild("CreditsText")
+local AdContainer: Frame = HUD:WaitForChild("AdContainer")
 
 local FramesGui: ScreenGui = LocalGui:WaitForChild("Frames")
 local SoldierShopFrame: Frame = FramesGui:WaitForChild("SoldierShop")
@@ -38,7 +41,9 @@ local TemplateNotification: TextLabel = NotificationFrame:WaitForChild("Template
 local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame, UnlockSlotFrame}
 local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false, UnlockSlotFrame = false}
 
-local HUDButtons = {SoldiersButton, StoreButton, SettingsButton}
+local HUDButtons = {SoldiersButton}
+local HUDButtonsPulse = {StoreButton, SettingsButton, CreditsButton, AdContainer}
+local HUDElements = {SoldiersButton, SettingsButton, AdContainer, StoreButton, CreditsButton, CreditsText}
 
 local ExpansionTweenInfo = TweenInfo.new(.25, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local DeflationTweenInfo = TweenInfo.new(.075, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
@@ -98,11 +103,11 @@ end
 
 local function CloseHUD(Fast: boolean)
     if Fast then
-        for _, Button in pairs(HUDButtons) do
+        for _, Button in pairs(HUDElements) do
             Button.Visible = false
         end
     else
-        for _, Button in pairs(HUDButtons) do
+        for _, Button in pairs(HUDElements) do
             task.wait(.05)
             ButtonClose(Button)
         end
@@ -114,12 +119,12 @@ end
 
 local function OpenHUD(Fast)
     if Fast then
-        for _, Button in pairs(HUDButtons) do
+        for _, Button in pairs(HUDElements) do
             Button.Visible = true
         end
         HUDActive = true
     else
-        for _, Button in pairs(HUDButtons) do
+        for _, Button in pairs(HUDElements) do
             ButtonOpen(Button)
             task.wait(.2)
         end
@@ -351,6 +356,49 @@ IdleRewardsClaimButton.MouseButton1Click:Connect(function()
     ActiveFramePriority = false
     CloseFrame(IdleRewardsFrame)
 end)
+
+-- Animation stuff
+
+-- Pulse animation for store button
+for _, Target in pairs(HUDButtonsPulse) do
+    -- Original size recorded as scale for responsive UIs
+    local OriginSize = Target:GetAttribute("OriginSize")
+    local PulseSize = UDim2.fromScale(OriginSize.X.Scale * 1.15, OriginSize.Y.Scale * 1.15)
+
+    local PulseTweenInfo = TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true)
+    local ShrinkTweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+    local PulseTween, ShrinkTween, IsHovering = nil, nil, false
+
+    local function StartPulse()
+        if PulseTween then
+            PulseTween:Cancel()
+        end
+        PulseTween = TweenService:Create(Target, PulseTweenInfo, {Size = PulseSize})
+        PulseTween:Play()
+    end
+    local function StopPulse()
+        if PulseTween then
+            PulseTween:Cancel()
+            PulseTween = nil
+        end
+        if ShrinkTween then
+            ShrinkTween:Cancel()
+        end
+        ShrinkTween = TweenService:Create(Target, ShrinkTweenInfo, {Size = OriginSize})
+        ShrinkTween:Play()
+    end
+
+    Target.MouseEnter:Connect(function()
+        if IsHovering then return end
+        IsHovering = true
+        StartPulse()
+    end)
+    Target.MouseLeave:Connect(function()
+        IsHovering = false
+        StopPulse()
+    end)
+end
 
 -- TODO Wait for loading screen to finish
 HUD.Enabled = true

@@ -124,6 +124,7 @@ local function PressCreditsButton(SoldierFrame: Frame, Type: string)
         local LogFrame: Frame = Log:WaitForChild("Template"):Clone()
 
         LogFrame.ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[Type]["Image"]
+        LogFrame.ViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[Type]["ShopColor"]
         LogFrame.Parent = Log
         LogFrame.Size = UDim2.fromScale(0,0)
         LogFrame.Name = GetNextLogName(Log)
@@ -272,6 +273,7 @@ local function InitializeStandardShop()
         RobuxButton.TextLabel.Text = "R$" .. Data["RobuxPrice"]
         local ViewTile = MainFrame:WaitForChild("ViewTile")
         ViewTile.Image.Image = Data["Image"]
+        ViewTile.BackgroundColor3 = Data["ShopColor"]
 
         SoldierFrame.Parent = StandardFrame:WaitForChild("ScrollingFrame")
 

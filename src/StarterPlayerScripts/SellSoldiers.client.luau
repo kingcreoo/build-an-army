@@ -100,6 +100,7 @@ local function ShowConfirmation(SoldierID: string)
 
 	-- Populate confirmation frame
 	ConfirmViewImage.Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
+	ConfirmViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
 	AmountLabel.Text = "$" .. SellValue
 	ConfirmSoldierLabel.Text = "SELL THIS " .. SoldierName
 
@@ -131,6 +132,7 @@ local function CreateFrame(SoldierID: string, SoldierData: table, PlayerData: ta
 	local SoldierType = SoldierData["Type"]
 
 	ViewTile:WaitForChild("Image").Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
+	ViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
 	SoldierFrame.Name = SoldierID
 
 	-- Set layout order based on rating (best soldiers first)
@@ -138,7 +140,6 @@ local function CreateFrame(SoldierID: string, SoldierData: table, PlayerData: ta
 	if Index then
 		SoldierFrame.LayoutOrder = 100 + Index
 		SoldierFrame:WaitForChild("Active").Visible = true
-		SoldierFrame:WaitForChild("Active").TextLabel.Text = "ACTIVE" .. tostring(Index)
 	else
 		SoldierFrame.LayoutOrder = RATING_ORDER_REVERSED[SoldierType] or 999
 		SoldierFrame:WaitForChild("Active").Visible = false
@@ -196,7 +197,6 @@ local function UpdateInventory(PlayerData: table)
 		if Index then
 			SoldierFrame.LayoutOrder = 100 + Index
 			SoldierFrame:WaitForChild("Active").Visible = true
-			SoldierFrame:WaitForChild("Active").TextLabel.Text = "ACTIVE" .. tostring(Index)
 		else
 			local SoldierData = PlayerData["Inventory"]["SoldierInventory"][SoldierID]
 			SoldierFrame.LayoutOrder = RATING_ORDER_REVERSED[SoldierData["Type"]] or 999

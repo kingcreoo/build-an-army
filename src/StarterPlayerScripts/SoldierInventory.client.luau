@@ -83,14 +83,16 @@ local function CreateFrame(SoldierID, SoldierData, PlayerData)
     local SoldierFrame = Template:Clone()
     local ViewTile = SoldierFrame:WaitForChild("ViewTile")
     local Button: TextButton = SoldierFrame:WaitForChild("Button")
-    ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[SoldierData["Type"]]["Image"]
+    local SoldierType = SoldierData["Type"]
+    
+    ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
+    ViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
     SoldierFrame.Name = SoldierID
 
     local Index = IsSoldierActive(PlayerData["Inventory"]["ActiveSoldiers"], SoldierID)
     if Index then
         SoldierFrame.LayoutOrder = Index
         SoldierFrame:WaitForChild("Active").Visible = true
-        SoldierFrame:WaitForChild("Active").TextLabel.Text = "ACTIVE" .. tostring(Index)
     else
         SoldierFrame.LayoutOrder = 100 + (SHOP_ORDER_REVERSED[SoldierData["Type"]] or 999)
         SoldierFrame:WaitForChild("Active").Visible = false
@@ -140,7 +142,6 @@ local function UpdateInventory(PlayerData: table)
         if Index then
             SoldierFrame.LayoutOrder = Index
             SoldierFrame:WaitForChild("Active").Visible = true
-            SoldierFrame:WaitForChild("Active").TextLabel.Text = "ACTIVE" .. tostring(Index)
         else
             local SoldierData = PlayerData["Inventory"]["SoldierInventory"][SoldierID]
             SoldierFrame.LayoutOrder = 100 + (SHOP_ORDER_REVERSED[SoldierData["Type"]] or 999)
@@ -204,7 +205,6 @@ local function UpdateAE(On: boolean)
         AutoEquipButton.BackgroundColor3 = Color1
         AutoEquipButton.UIStroke.Color = Color2
         AutoEquipButton.TextLabel.UIStroke.Color = Color2
-        AutoEquipButton.TextLabel.Text = "On"
     else
         local Color1 = AutoEquipButton:GetAttribute("OffColor1")
         local Color2 = AutoEquipButton:GetAttribute("OffColor2")
@@ -212,7 +212,6 @@ local function UpdateAE(On: boolean)
         AutoEquipButton.BackgroundColor3 = Color1
         AutoEquipButton.UIStroke.Color = Color2
         AutoEquipButton.TextLabel.UIStroke.Color = Color2
-        AutoEquipButton.TextLabel.Text = "Off"
     end
 end
 
