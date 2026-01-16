@@ -1,27 +1,44 @@
 # build-an-army
- 
-Build an army is a simple, easy, aesthetically pleasing ROBLOX game. It is a kind of Tycoon game almost similiar to Grow a garden! The player has a team of soldiers that destroy targets endlessly without the push of a button & even work when the player is offline.
+Build an army is a simple, easy, aesthetically pleasing ROBLOX game. The player manages a team of soldiers that destroy targets endlessly, without the push of a button & even work when the player is offline.
 
-## The core gameplay loop: 
+## Notice
+My ROBLOX game development journey has been a large part of my young life and I have spent a serious amount of time working on various games, most to incompletion. I have now reconsidered my alignment with ROBLOX and decided to release none of my games due to ROBLOX's mismanagement of their effect on our young children. I still plan on completing a few of my ideas and publishing devlogs overviewing my design and programming decisions on my website. 
 
-The player has a plot of land with a group of soldiers that are ever-firing at a group of targets across from them. When the soldiers kill a target the player is rewarded with credits. With credits the player can purchase or upgrade soldiers & unlock new targets with higher rewards.
+This repo will stay public and acts as a window into my thought processes and written code. Below is an overview of project todos & all of the code in this repo is documented. However views of my 3D models and playtests of the game will only be available on my website, not here in this repo.
 
-## Full feature idea list (to be referenced as a far reaching 'dreams' for the game):
+## Project To-Do List:
 
-1. The game has a central baseplate with shops and items that aren't specific to a player in the center. Each player gets their own plot on the baseplate that displays their soldiers.
-2. Players can manage their soldier lineup through a GUI.
-3. Players can purchase new soldiers directly at the barracks located in the center of the baseplate.
-4. Players can upgrade their soldier's stats at the armory located in the center of the baseplate.
-5. Players can unlock new targets at the target shop located in the center of the baseplate.
-6. Players can rebirth after completing a portion of the game & earn rebirth tokens that can be used to purchase strong multipliers or special soldiers.
-7. Players can purchase pets that act as multipliers or offer some kind of boost.
-8. Players can purchase or earn 'boosts' that will temporarily boost the effectiveness of their team of soldiers.
-9. Players can grow a 'boost tree' on their plot that will drop boosts that automatically apply after 'growing' on the tree.
+### COMPLETED
+[x] Persistent, secure, modular player-data storage using tables
+[x] Plot distribution and management
+[x] Soldier & Target combat with clean bullet creation/animation & animated target deaths/rewards utilizing a dual-loop heartbeat system split between the client and server
+[x] Soldier Inventory, allowing for players to manage which soldiers are active
+[x] Soldier Shop, allowing for players to purchase new soldiers. Including a 'stock management' system for the shop - rarer soldiers only appear in stock at certain times (random)
+[x] Target Upgrades
+[x] Additional slot unlocks
+[x] Soldier selling
+[x] Weapon variety ex: dual wielded pistols, burst weapons, etc
+[x] Settings, including auto-equip, turning off other player's soldiers for low-performance devices, turning off background music, and an accompanying settings UI
+[x] Idle Rewards
+[x] Credits HUD
+[x] Notifications
+[x] Health bars for targets
+[x] Status bars for soldiers
+[x] Background music and UI sounds
 
-## References:
+### BUILDS
+[] Map Build
+[] 24 Base-game Soldiers
+[] 12 Base-game Targets
 
-Soldiers should be lined up in an exact row almost like an execution squad.
-There are 'slots' for the soldier (the player can control which soldier is in each slot).
-Soldier in 'slot1' always fires at the target in 'slot1' and never any other target, the same for every other soldier.
+### MONETIZATION
+[] VIP Gamepass
+[] Credits Purchases
+[] Soldier Purchases
 
-Code can be used from the second directly 'shoot the enemy' which was a prior game idea, but could have valuable code that's already written and could be applied here.
+### POSSIBLE UPDATES
+[] Boosts and the boost tree which allows free-players to earn boosts
+[] Rebirths and rebirth shop for overpowered bonuses
+[] Mercenaries, overpowered soldiers for rent
+[] Soldier Merging
+[] Global Boost Events
