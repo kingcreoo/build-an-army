@@ -9,36 +9,36 @@ This repo will stay public and acts as a window into my thought processes and wr
 ## Project To-Do List:
 
 ### COMPLETED
-[x] Persistent, secure, modular player-data storage using tables
-[x] Plot distribution and management
-[x] Soldier & Target combat with clean bullet creation/animation & animated target deaths/rewards utilizing a dual-loop heartbeat system split between the client and server
-[x] Soldier Inventory, allowing for players to manage which soldiers are active
-[x] Soldier Shop, allowing for players to purchase new soldiers. Including a 'stock management' system for the shop - rarer soldiers only appear in stock at certain times (random)
-[x] Target Upgrades
-[x] Additional slot unlocks
-[x] Soldier selling
-[x] Weapon variety ex: dual wielded pistols, burst weapons, etc
-[x] Settings, including auto-equip, turning off other player's soldiers for low-performance devices, turning off background music, and an accompanying settings UI
-[x] Idle Rewards
-[x] Credits HUD
-[x] Notifications
-[x] Health bars for targets
-[x] Status bars for soldiers
-[x] Background music and UI sounds
+- Persistent, secure, modular player-data storage using tables
+- Plot distribution and management
+- Soldier & Target combat with clean bullet creation/animation & animated target deaths/rewards utilizing a dual-loop heartbeat system split between the client and server
+- Soldier Inventory, allowing for players to manage which soldiers are active
+- Soldier Shop, allowing for players to purchase new soldiers. Including a 'stock management' system for the shop - rarer soldiers only appear in stock at certain times (random)
+- Target Upgrades
+- Additional slot unlocks
+- Soldier selling
+- Weapon variety ex: dual wielded pistols, burst weapons, etc
+- Settings, including auto-equip, turning off other player's soldiers for low-performance devices, turning off background music, and an accompanying settings UI
+- Idle Rewards
+- Credits HUD
+- Notifications
+- Health bars for targets
+- Status bars for soldiers
+- Background music and UI sounds
 
-### BUILDS
-[] Map Build
-[] 24 Base-game Soldiers
-[] 12 Base-game Targets
+### INCOMPLETE - BUILDS
+- Map Build
+- 24 Base-game Soldiers
+- 12 Base-game Targets
 
-### MONETIZATION
-[] VIP Gamepass
-[] Credits Purchases
-[] Soldier Purchases
+### INCOMPLETE - MONETIZATION
+- VIP Gamepass
+- Credits Purchases
+- Soldier Purchases
 
-### POSSIBLE UPDATES
-[] Boosts and the boost tree which allows free-players to earn boosts
-[] Rebirths and rebirth shop for overpowered bonuses
-[] Mercenaries, overpowered soldiers for rent
-[] Soldier Merging
-[] Global Boost Events
+### INCOMPLETE - POSSIBLE FUTURE UPDATES
+- Boosts and the boost tree which allows free-players to earn boosts
+- Rebirths and rebirth shop for overpowered bonuses
+- Mercenaries, overpowered soldiers for rent
+- Soldier Merging
+- Global Boost Events
