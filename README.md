@@ -6,6 +6,8 @@ My ROBLOX game development journey has been a large part of my young life and I 
 
 This repo will stay public and acts as a window into my thought processes and written code. Below is an overview of project todos & all of the code in this repo is documented. However views of my 3D models and playtests of the game will only be available on my website, not here in this repo.
 
+https://collindesantis.com
+
 ## Project To-Do List:
 
 ### COMPLETED
