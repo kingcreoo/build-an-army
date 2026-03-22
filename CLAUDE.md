@@ -8,8 +8,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **README.md** Provides a clear explanation of this game's core concept & an outline of some features. It speaks in the future tense about this game for when it is completed.
 
-**TODO.md** Provides clear outlines of each task; describing their ultimate goal and any architectural details that must come along with it. Located at `/home/creoo/Brain/build an army/TODO.md`.
-
 **STUDIO.md** Provides an outline of where things are located in ROBLOX studio. This is updated by the human who manages claude and this repo whenever things are changed in studio, along with a git commit.
 
 ## Code & comment conventions
@@ -47,24 +45,6 @@ The human who manages claude (and any other AI Agent) is constantly updating the
 All remotes (RemoteEvents, RemoteFunctions, and bindables) are located in ReplicatedStorage.Remotes.
 
 You can always request that something be added into studio WHEN IN PLAN MODE.
-
-## Brain directory
-
-The Brain directory (`/home/creoo/Brain`) contains the human's Obsidian vault with thoughts, concepts, and project notes. This includes:
-- Development thoughts and project planning
-- Game concepts and ideas  
-- Personal notes and reflections
-- Project-specific todos and documentation
-
-**IMPORTANT: You must NEVER edit anything inside the Brain directory. It is read-only for reference purposes only.**
-
-## Past directories
-
-The human who manages claude has added additional directories to your access:
-
-**shoot-the-enemy** - Contains valuable files that could be directly applied here, or applied with some changes. You are allowed to read these files and copy code over to this directory, but you are not allowed to edit the shoot-the-enemy directory.
-
-**Brain** - Contains the human's thoughts, notes, and project planning. Read-only access for reference purposes. NEVER edit anything in this directory.
 
 - Delete tasks after you are finished using them
 - Always use PascalCase.
