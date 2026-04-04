@@ -69,6 +69,19 @@ local function CreateReversedTable(Table)
 end
 local RATING_ORDER_REVERSED = CreateReversedTable(SETTINGS.RATING_ORDER)
 
+-- Applies a soldier's shop color and gradient to a ViewTile
+local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
+	local Data = SETTINGS.SOLDIER_DATA[SoldierType]
+	ViewTile.BackgroundColor3 = Data["ShopColor"]
+
+	local Gradient = ViewTile:FindFirstChildOfClass("UIGradient")
+	if not Gradient then
+		Gradient = Instance.new("UIGradient")
+		Gradient.Parent = ViewTile
+	end
+	Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
+end
+
 -- Checks if a soldier is currently active
 local function IsSoldierActive(ActiveSoldiers, SoldierID)
 	for Index, ID in pairs(ActiveSoldiers) do
@@ -96,7 +109,7 @@ local function ShowConfirmation(SoldierID: string)
 
 	-- Populate confirmation frame
 	ConfirmViewImage.Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
-	ConfirmViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
+	ApplyViewTileStyle(ConfirmViewTile, SoldierType)
 	AmountLabel.Text = "$" .. SellValue
 	ConfirmSoldierLabel.Text = "SELL THIS " .. SoldierName
 
@@ -140,7 +153,7 @@ local function CreateFrame(SoldierID: string, SoldierData: table, PlayerData: ta
 	local SoldierType = SoldierData["Type"]
 
 	ViewTile:WaitForChild("Image").Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
-	ViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
+	ApplyViewTileStyle(ViewTile, SoldierType)
 	SoldierFrame.Name = SoldierID
 
 	-- Set layout order based on rating (best soldiers first)

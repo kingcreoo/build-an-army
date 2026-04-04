@@ -64,6 +64,19 @@ local function CreateReversedTable(Table)
 end
 local SHOP_ORDER_REVERSED = CreateReversedTable(SETTINGS.SHOP_ORDER)
 
+-- Applies a soldier's shop color and gradient to a ViewTile
+local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
+    local Data = SETTINGS.SOLDIER_DATA[SoldierType]
+    ViewTile.BackgroundColor3 = Data["ShopColor"]
+
+    local Gradient = ViewTile:FindFirstChildOfClass("UIGradient")
+    if not Gradient then
+        Gradient = Instance.new("UIGradient")
+        Gradient.Parent = ViewTile
+    end
+    Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
+end
+
 local function IsSoldierActive(ActiveSoldiers, SoldierID)
     for Index, ID in pairs(ActiveSoldiers) do
         if ID == SoldierID then
@@ -80,7 +93,7 @@ local function CreateFrame(SoldierID, SoldierData, PlayerData)
     local SoldierType = SoldierData["Type"]
     
     ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
-    ViewTile.BackgroundColor3 = SETTINGS.SOLDIER_DATA[SoldierType]["ShopColor"]
+    ApplyViewTileStyle(ViewTile, SoldierType)
     SoldierFrame.Name = SoldierID
 
     local Index = IsSoldierActive(PlayerData["Inventory"]["ActiveSoldiers"], SoldierID)
