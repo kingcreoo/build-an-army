@@ -30,8 +30,8 @@ local UnlockSlotFrame: Frame = FramesGui:WaitForChild("UnlockSlotFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
-local IdleRewardsHours: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Hours")
-local IdleRewardsPercent: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Percent")
+--local IdleRewardsHours: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Hours")
+--local IdleRewardsPercent: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Percent")
 local IdleRewardsClaimButton: TextButton = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Claim")
 
 local NotificationFrame: Frame = FramesGui:WaitForChild("NotificationFrame")
@@ -216,20 +216,20 @@ local function ShowIdleRewards(Amount: number, HasVIP: boolean, ClampedTimeAway:
 
     -- 2) Set the hours text
     -- Default text is "In x hour (48 hours max)"
-    local HoursAway = FormatHoursFromSeconds(ClampedTimeAway)
-    if HasVIP then
-        IdleRewardsHours.Text = "In " .. HoursAway .. " hours (72 hours max)"
-    else
-        IdleRewardsHours.Text = "In " .. HoursAway .. " hours (48 hours max)"
-    end
+    -- local HoursAway = FormatHoursFromSeconds(ClampedTimeAway)
+    -- if HasVIP then
+    --     IdleRewardsHours.Text = "In " .. HoursAway .. " hours (72 hours max)"
+    -- else
+    --     IdleRewardsHours.Text = "In " .. HoursAway .. " hours (48 hours max)"
+    -- end
 
     -- 3) Set the percent text
     -- Default text is "At 50% rate" (100% for VIP)
-    if HasVIP then
-        IdleRewardsPercent.Text = "At 100% rate"
-    else
-        IdleRewardsPercent.Text = "At 50% rate"
-    end
+    --  if HasVIP then
+    --    IdleRewardsPercent.Text = "At 100% rate"
+    -- else
+    --     IdleRewardsPercent.Text = "At 50% rate"
+    -- end
 
     -- 4) Show VIP advertisement if player isn't VIP
     -- TODO

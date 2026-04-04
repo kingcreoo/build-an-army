@@ -52,20 +52,12 @@ local FrameActive
 
 local function UpdateItem(Item: string, On: boolean)
     if On then
-        local Color1 = Items[Item].Button:GetAttribute("OnColor1")
-        local Color2 = Items[Item].Button:GetAttribute("OnColor2")
-
-        Items[Item].Button.BackgroundColor3 = Color1
-        Items[Item].Button.UIStroke.Color = Color2
-        Items[Item].Button.TextLabel.UIStroke.Color = Color2
+        Items[Item].Button.BackgroundColor3 = Items[Item].Button:GetAttribute("OnColor1")
+        Items[Item].Button.UIGradient.Color = ColorSequence.new(Color3.fromHex("#34ff25"), Color3.fromHex("#61bd8f"))
         Items[Item].Button.TextLabel.Text = "On"
     else
-        local Color1 = Items[Item].Button:GetAttribute("OffColor1")
-        local Color2 = Items[Item].Button:GetAttribute("OffColor2")
-
-        Items[Item].Button.BackgroundColor3 = Color1
-        Items[Item].Button.UIStroke.Color = Color2
-        Items[Item].Button.TextLabel.UIStroke.Color = Color2
+        Items[Item].Button.BackgroundColor3 = Items[Item].Button:GetAttribute("OffColor1")
+        Items[Item].Button.UIGradient.Color = ColorSequence.new(Color3.fromHex("#ffd4d4"), Color3.fromHex("#c60000"))
         Items[Item].Button.TextLabel.Text = "Off"
     end
 end

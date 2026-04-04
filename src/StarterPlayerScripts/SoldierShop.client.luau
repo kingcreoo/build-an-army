@@ -112,10 +112,9 @@ local function PressCreditsButton(SoldierFrame: Frame, Type: string)
 
             CreditsButton.TextLabel.Text = "NO STOCK"
             CreditsButton.TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-            CreditsButton.TextLabel.UIStroke.Color = Color3.fromRGB(0, 0, 0)
 
             CreditsButton.BackgroundColor3 = Color3.fromRGB(98, 98, 98)
-            CreditsButton.UIStroke.Color = Color3.fromRGB(61, 61, 61)
+            CreditsButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#ffd4d4"), Color3.fromHex("#c60000"))
         else
             local Stock: TextLabel = SoldierFrame:WaitForChild("MainFrame"):WaitForChild("Stock")
             Stock.Text = CurrentStock[Type] .. "x Stock"
@@ -235,20 +234,18 @@ local function StockStandardShop()
 
             CreditsButton.TextLabel.Text = "NO STOCK"
             CreditsButton.TextLabel.TextColor3 = Color3.fromRGB(255, 0, 0)
-            CreditsButton.TextLabel.UIStroke.Color = Color3.fromRGB(0, 0, 0)
 
             CreditsButton.BackgroundColor3 = Color3.fromRGB(98, 98, 98)
-            CreditsButton.UIStroke.Color = Color3.fromRGB(61, 61, 61)
+            CreditsButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#ffd4d4"), Color3.fromHex("#c60000"))
         else
             Stock.Text = StockedSoldiers .. "x Stock"
             Stock.TextColor3 = Color3.fromRGB(255, 255, 255)
 
             CreditsButton.TextLabel.Text = "$" .. SETTINGS.SOLDIER_DATA[Type]["Price"]
             CreditsButton.TextLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            CreditsButton.TextLabel.UIStroke.Color = CreditsButton.UIStroke:GetAttribute("InStockColor")
 
             CreditsButton.BackgroundColor3 = CreditsButton:GetAttribute("InStockColor")
-            CreditsButton.UIStroke.Color = CreditsButton.UIStroke:GetAttribute("InStockColor")
+            CreditsButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#34ff25"), Color3.fromHex("#61bd8f"))
         end
     end
 end

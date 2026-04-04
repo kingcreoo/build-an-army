@@ -199,19 +199,11 @@ local function UpdateAE(On: boolean)
     UpdateSettingBindable:Fire("AutoEquip", On)
 
     if On then
-        local Color1 = AutoEquipButton:GetAttribute("OnColor1")
-        local Color2 = AutoEquipButton:GetAttribute("OnColor2")
-
-        AutoEquipButton.BackgroundColor3 = Color1
-        AutoEquipButton.UIStroke.Color = Color2
-        AutoEquipButton.TextLabel.UIStroke.Color = Color2
+        AutoEquipButton.BackgroundColor3 = AutoEquipButton:GetAttribute("OnColor1")
+        AutoEquipButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#34ff25"), Color3.fromHex("#61bd8f"))
     else
-        local Color1 = AutoEquipButton:GetAttribute("OffColor1")
-        local Color2 = AutoEquipButton:GetAttribute("OffColor2")
-
-        AutoEquipButton.BackgroundColor3 = Color1
-        AutoEquipButton.UIStroke.Color = Color2
-        AutoEquipButton.TextLabel.UIStroke.Color = Color2
+        AutoEquipButton.BackgroundColor3 = AutoEquipButton:GetAttribute("OffColor1")
+        AutoEquipButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#ffd4d4"), Color3.fromHex("#c60000"))
     end
 end
 
