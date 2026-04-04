@@ -5,16 +5,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- // CRITICAL: Connect to LoadPlayerEvent FIRST before any WaitForChild calls
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-
--- Cache player data if event fires before we finish initializing
-local CachedPlayerData = nil
-
-LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
-	CachedPlayerData = PlayerData
-end)
+local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
@@ -246,10 +239,14 @@ local function InitializeInventory(PlayerData: table)
     end
 end
 
--- Processes player data (called from cached data or future events)
+-- Processes player data on initial load or refresh
 local function ProcessPlayerData(PlayerData: table)
-	LatestData = PlayerData
-	InitializeInventory(PlayerData)
+	if LatestData == nil then
+		LatestData = PlayerData
+		InitializeInventory(PlayerData)
+	else
+		UpdateInventory(PlayerData)
+	end
 	UpdateAE(PlayerData.Settings.AutoEquip)
 end
 
@@ -286,7 +283,5 @@ UpdateInventoryBindable.Event:Connect(UpdateInventory)
 ActivateBindable.Event:Connect(ActivateSoldier)
 DeactivateBindable.Event:Connect(DeactivateSoldier)
 
--- Process cached data if event fired before we finished initializing
-if CachedPlayerData then
-	ProcessPlayerData(CachedPlayerData)
-end
+-- Pull player data from server
+ProcessPlayerData(GetPlayerDataFunction:InvokeServer())

@@ -35,6 +35,7 @@ local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("Deactiva
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
 local UnlockSlotEvent: RemoteEvent = Remotes:WaitForChild("UnlockSlot")
+local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -470,3 +471,14 @@ UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
 	local Response, PlayerData = UnlockSlot(Player)
 	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
 end)
+
+-- Returns player data, waiting until it is loaded if needed
+GetPlayerDataFunction.OnServerInvoke = function(Player: Player)
+	local Timeout = 10
+	local Elapsed = 0
+	while not Data.Get(Player) and Elapsed < Timeout do
+		task.wait(0.1)
+		Elapsed += 0.1
+	end
+	return Data.Get(Player)
+end

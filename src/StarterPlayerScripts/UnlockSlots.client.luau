@@ -6,16 +6,9 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 
--- // CRITICAL: Connect to LoadPlayerEvent FIRST before any WaitForChild calls
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-
--- Cache player data if event fires before we finish initializing
-local CachedPlayerData = nil
-
-LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
-	CachedPlayerData = PlayerData
-end)
+local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
@@ -231,7 +224,5 @@ LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
 end)
 
--- Process cached data if event fired before we finished initializing
-if CachedPlayerData then
-	ProcessPlayerData(CachedPlayerData)
-end
+-- Pull player data from server
+ProcessPlayerData(GetPlayerDataFunction:InvokeServer())

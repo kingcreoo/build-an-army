@@ -13,18 +13,11 @@ local SOUND_MANAGER = nil
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
 
--- Connect to remotes FIRST to avoid race condition
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
+local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
-
--- Store PlayerData if event fires before we're ready
-local CachedPlayerData = nil
-
-LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
-	CachedPlayerData = PlayerData
-end)
 
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
 local FramesGui = LocalGui:WaitForChild("Frames")
@@ -222,7 +215,5 @@ LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
 end)
 
--- Process cached data if event fired before we finished initializing
-if CachedPlayerData then
-	ProcessPlayerData(CachedPlayerData)
-end
+-- Pull player data from server
+ProcessPlayerData(GetPlayerDataFunction:InvokeServer())
