@@ -1,13 +1,6 @@
 # build-an-army
 Build an army is a simple, easy, aesthetically pleasing ROBLOX game. The player manages a team of soldiers that destroy targets endlessly, without the push of a button & even work when the player is offline.
 
-## Notice
-My ROBLOX game development journey has been a large part of my young life and I have spent a serious amount of time working on various games, most to incompletion. I have now reconsidered my alignment with ROBLOX and decided to release none of my games due to ROBLOX's mismanagement of their effect on our young children. I still plan on completing a few of my ideas and publishing devlogs overviewing my design and programming decisions on my website. 
-
-This repo will stay public and acts as a window into my thought processes and written code. Below is an overview of project todos & all of the code in this repo is documented. However views of my 3D models and playtests of the game will only be available on my website, not here in this repo.
-
-https://collindesantis.com
-
 ## Project To-Do List:
 
 ### COMPLETED
@@ -28,17 +21,31 @@ https://collindesantis.com
 - Status bars for soldiers
 - Background music and UI sounds
 
-### INCOMPLETE - BUILDS
-- Map Build
-- 24 Base-game Soldiers
-- 12 Base-game Targets
+### INCOMPLETE
 
-### INCOMPLETE - MONETIZATION
-- VIP Gamepass
-- Credits Purchases
-- Soldier Purchases
+- Hitmarker damage markers, cash added animations
 
-### INCOMPLETE - POSSIBLE FUTURE UPDATES
+- 12 Base-game soldiers fully fleshed out. Armor + Weapon models, Icons, Animations.
+- Tier 1: Grunt, Shotgunner, Heavy, Sniper, dual pistol, spray 'n pray. All light blue aesthetic but each has a unique weapon mechanic
+- Tier 2: Captain (Revolver), Backpack Bandit (AK), Baseball cap Raider (AR or shotgun, undecided). Deep red 'elite' 'bandit' aesthetics.
+- Tier 3: Vector (uses actual vector), One-shot (high tech sniper rifle), Akimbo (dual macs). A mix between techno - but art deco - stylings. Unique troopers
+
+- 2 Premium purchase soldiers. Armor + weapon models, icons, animations + standing on pedastal near store models.
+- Flesh out purchasing robux soldiers.
+- Flesh out gifting soldiers.
+
+- Layout games progression mechanics. The curve of purchasing higher ranked soldiers and targets.
+
+- Commander pass functionality + advertising. Extra soldier, more idle cash, etc.
+- Credits purchases
+
+- Polish map
+- Polish plot
+- Polish UI, music, etc
+
+- Create Icons, Thumbnails, Ads
+
+- ### INCOMPLETE - POSSIBLE FUTURE UPDATES
 - Boosts and the boost tree which allows free-players to earn boosts
 - Rebirths and rebirth shop for overpowered bonuses
 - Mercenaries, overpowered soldiers for rent
