@@ -269,7 +269,10 @@ local function OnPlayerAdded(Player: Player)
     local Character = Player.Character or Player.CharacterAdded:Wait()
     Character:SetPrimaryPartCFrame(PlayerPlot.Plot.Spawn.CFrame + Vector3.new(0, 3, 0))
 
-    -- 5) TODO Present player's offline earnings
+    -- 5) Run AutoEquip in case inventory changed while offline
+    AutoEquip(Player)
+
+    -- 6) TODO Present player's offline earnings
     LoadPlayerEvent:FireClient(Player, PlayerData)
 end
 

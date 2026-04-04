@@ -11,6 +11,7 @@ local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerDat
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
+local SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 -- // Variables
 local LocalPlayer = Players.LocalPlayer
@@ -97,6 +98,13 @@ local function CreateFrame(SoldierID, SoldierData, PlayerData)
     SoldiersDisplayed[SoldierID] = SoldierFrame
 
     Button.MouseButton1Click:Connect(function()
+        -- Block manual toggling while AutoEquip is enabled
+        if LatestData["Settings"]["AutoEquip"] then
+            SOUND_MANAGER:PlayError()
+            NotifyBindable:Fire("Disable AutoEquip to manage soldiers!", .8, Color3.fromRGB(255, 0, 0))
+            return
+        end
+
         -- Check if this soldier is currently active or inactive
         local Active = IsSoldierActive(LatestData["Inventory"]["ActiveSoldiers"], SoldierID)
         if Active then
@@ -189,8 +197,6 @@ local function ActivateSoldier(SoldierID)
 end
 
 local function UpdateAE(On: boolean)
-    UpdateSettingBindable:Fire("AutoEquip", On)
-
     if On then
         AutoEquipButton.BackgroundColor3 = AutoEquipButton:GetAttribute("OnColor1")
         AutoEquipButton.UIGradient.Color = ColorSequence.new(Color3.fromHex("#34ff25"), Color3.fromHex("#61bd8f"))
@@ -222,6 +228,12 @@ local function ChangeAE()
     end
 
     UpdateAE(On)
+    UpdateSettingBindable:Fire("AutoEquip", On)
+
+    -- Sync local state with server
+    if LatestData then
+        LatestData["Settings"]["AutoEquip"] = On
+    end
 
     -- Refresh inventory UI if AutoEquip changed active soldiers
     if PlayerData then
@@ -265,6 +277,7 @@ end
 
 CloseButton.MouseButton1Click:Connect(function()
     if FrameActive == false then return end
+    SOUND_MANAGER:PlayClick()
     CloseFrameBindable:Fire(SoldierInventoryFrame)
 end)
 
@@ -278,6 +291,23 @@ LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 end)
 
 AutoEquipButton.MouseButton1Click:Connect(ChangeAE)
+
+-- Sync AutoEquip state if changed externally (e.g. from the Settings GUI)
+UpdateSettingBindable.Event:Connect(function(Item: string, On: boolean)
+    if Item ~= "AutoEquip" then return end
+    if LatestData and LatestData["Settings"]["AutoEquip"] == On then return end
+
+    UpdateAE(On)
+    if LatestData then
+        LatestData["Settings"]["AutoEquip"] = On
+    end
+
+    -- Pull fresh data so ActiveSoldiers reflect any AutoEquip changes
+    local PlayerData = GetPlayerDataFunction:InvokeServer()
+    if PlayerData then
+        UpdateInventory(PlayerData)
+    end
+end)
 
 UpdateInventoryBindable.Event:Connect(UpdateInventory)
 ActivateBindable.Event:Connect(ActivateSoldier)
