@@ -306,6 +306,7 @@ local function UpdateSetting(Player: Player, Item: string)
         -- If AutoEquip was just enabled, run it immediately
         if Item == "AutoEquip" then
             AutoEquip(Player)
+            return true, true, nil, Data.Get(Player)
         end
 
         return true, true
@@ -395,7 +396,10 @@ local function UnlockSlot(Player: Player)
     local ActiveTarget = PlayerData.Inventory.ActiveTarget
     PlayerPlotManagers[Player.Name]:SetTarget(ActiveTarget)
 
-    return "Unlocked", PlayerData
+    -- 11) AutoEquip into the new lane if enabled
+    AutoEquip(Player)
+
+    return "Unlocked", Data.Get(Player)
 end
 
 -- // Events & Calling
@@ -437,9 +441,9 @@ DeactivateSoldierFunction.OnServerInvoke = function(Player: Player, SoldierID: s
 end
 
 UpdateSettingFunction.OnServerInvoke = function(Player: Player, Item: string)
-	local Arg1, Arg2, Arg3 = UpdateSetting(Player, Item)
+	local Arg1, Arg2, Arg3, Arg4 = UpdateSetting(Player, Item)
 
-	return Arg1, Arg2, Arg3
+	return Arg1, Arg2, Arg3, Arg4
 end
 
 UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)

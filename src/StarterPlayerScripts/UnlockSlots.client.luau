@@ -31,6 +31,7 @@ local ButtonExpandBindable: BindableEvent = Remotes:WaitForChild("ButtonExpand")
 local ButtonDeflateBindable: BindableEvent = Remotes:WaitForChild("ButtonDeflate")
 local CloseFrameBindable: BindableEvent = Remotes:WaitForChild("CloseFrame")
 local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
+local UpdateInventoryBindable: BindableEvent = Remotes:WaitForChild("UpdateInventory")
 
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
 local FramesGui = LocalGui:WaitForChild("Frames")
@@ -197,6 +198,7 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 		SOUND_MANAGER:PlayPurchase()
 		NotifyBindable:Fire("Slot " .. NextSlotToUnlock .. " unlocked!", 0.8, Color3.fromRGB(0, 255, 0))
 		LatestData = PlayerData
+		UpdateInventoryBindable:Fire(PlayerData)
 		
 		-- Check for next slot
 		NextSlotToUnlock = GetNextSlotToUnlock(PlayerData)

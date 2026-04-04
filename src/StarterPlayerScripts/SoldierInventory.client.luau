@@ -216,7 +216,7 @@ local function ChangeAE()
 
     Bounces += 1
 
-    local Success, On, ErrorMessage = UpdateSettingFunction:InvokeServer("AutoEquip")
+    local Success, On, ErrorMessage, PlayerData = UpdateSettingFunction:InvokeServer("AutoEquip")
 
     if not Success then
         NotifyBindable:Fire(ErrorMessage, .8, Color3.fromRGB(255, 0, 0))
@@ -229,6 +229,11 @@ local function ChangeAE()
     end
 
     UpdateAE(On)
+
+    -- Refresh inventory UI if AutoEquip changed active soldiers
+    if PlayerData then
+        UpdateInventory(PlayerData)
+    end
 
     task.delay(1, function()
         Bounces -= 1
