@@ -38,6 +38,7 @@ local FramesGui = LocalGui:WaitForChild("Frames")
 
 local SellSoldiersFrame: Frame = FramesGui:WaitForChild("SellSoldiersFrame")
 local MainFrame: Frame = SellSoldiersFrame:WaitForChild("MainFrame")
+local LabelBar: Frame = SellSoldiersFrame:WaitForChild("LabelBar")
 local CloseButton: TextButton = SellSoldiersFrame:WaitForChild("Close")
 local InventoryFrame: Frame = MainFrame:WaitForChild("Inventory")
 local ScrollingFrame: ScrollingFrame = InventoryFrame:WaitForChild("ScrollingFrame")
@@ -106,24 +107,36 @@ local function ShowConfirmation(SoldierID: string)
 	AmountLabel.Text = "$" .. SellValue
 	ConfirmSoldierLabel.Text = "SELL THIS " .. SoldierName
 
-	-- Make confirmation frame visible
-	ConfirmFrame.Visible = true
+	-- Tween sell view out (MainFrame + LabelBar + Close)
+	TweenService:Create(MainFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 1.8)}):Play()
+	TweenService:Create(LabelBar, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 1.3)}):Play()
+	TweenService:Create(CloseButton, TweenInfo_Slide, {Position = UDim2.fromScale(0.7, 1.3)}):Play()
 
-	-- Tween main frame down to reveal confirmation
-	local SlideTween = TweenService:Create(SellSoldiersFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 1.5)})
-	SlideTween:Play()
+	-- Tween confirm view in from above
+	ConfirmFrame.Visible = true
+	ConfirmMainFrame.Position = UDim2.fromScale(0.5, -0.5)
+	ConfirmFrame.LabelBar.Position = UDim2.fromScale(0.5, -0.5)
+	TweenService:Create(ConfirmMainFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.5)}):Play()
+	TweenService:Create(ConfirmFrame.LabelBar, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.162668332)}):Play()
 end
 
--- Tweens the main frame back to center, hiding confirmation
+-- Tweens the confirm frame out and sell view back in
 local function HideConfirmation()
 	SelectedSoldierID = nil
 
-	-- Hide confirmation frame
-	ConfirmFrame.Visible = false
+	-- Tween confirm view out
+	TweenService:Create(ConfirmMainFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, -0.5)}):Play()
+	TweenService:Create(ConfirmFrame.LabelBar, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, -0.5)}):Play()
 
-	-- Tween main frame back to center
-	local SlideTween = TweenService:Create(SellSoldiersFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.5)})
-	SlideTween:Play()
+	-- Tween sell view back in
+	TweenService:Create(MainFrame, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.5)}):Play()
+	TweenService:Create(LabelBar, TweenInfo_Slide, {Position = UDim2.fromScale(0.5, 0.162668332)}):Play()
+	TweenService:Create(CloseButton, TweenInfo_Slide, {Position = UDim2.fromScale(0.7, 0.163)}):Play()
+
+	-- Hide confirm frame after tween completes
+	task.delay(0.3, function()
+		ConfirmFrame.Visible = false
+	end)
 end
 
 -- Creates a soldier frame in the sell list
@@ -282,7 +295,10 @@ SellSoldiersFrame:GetPropertyChangedSignal("Visible"):Connect(function()
 
 	-- Reset to main view when frame opens
 	if FrameActive then
-		SellSoldiersFrame.Position = UDim2.fromScale(0.5, 0.5)
+		ConfirmFrame.Visible = false
+		MainFrame.Position = UDim2.fromScale(0.5, 0.5)
+		LabelBar.Position = UDim2.fromScale(0.5, 0.162668332)
+		CloseButton.Position = UDim2.fromScale(0.7, 0.163)
 		SelectedSoldierID = nil
 	end
 end)
