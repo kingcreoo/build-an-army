@@ -29,6 +29,7 @@ local SoldierTimers = {}
 
 local SoldierModels = ReplicatedStorage:WaitForChild("Types"):WaitForChild("Soldiers")
 local TargetModels = ReplicatedStorage:WaitForChild("Types"):WaitForChild("Targets")
+local MarkerTemplate = ReplicatedStorage:WaitForChild("Types"):WaitForChild("Marker")
 
 local EntityHandler = EntityHandlerModule.new({"StandardBullet", "StandardExplosion"})
 
@@ -280,6 +281,73 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     end
 end
 
+local DAMAGE_COLOR = Color3.fromRGB(255, 60, 60)
+local MarkerCounter = 0
+
+-- Spawns a single floating marker at the given world position with the given text and color
+local function SpawnMarker(SpawnPos: Vector3, Text: string, Color: Color3, AngleDeg: number?)
+    -- 1) Throwaway anchor so marker survives parent destruction
+    local Anchor = Instance.new("Part")
+    Anchor.Anchored = true
+    Anchor.CanCollide = false
+    Anchor.Transparency = 1
+    Anchor.Size = Vector3.new(0.1, 0.1, 0.1)
+    Anchor.CFrame = CFrame.new(SpawnPos)
+    Anchor.Parent = Workspace
+
+    local Marker = MarkerTemplate:Clone()
+    Marker.Adornee = Anchor
+    Marker.Parent = Anchor
+
+    -- 2) Apply text and color
+    local Label: TextLabel = Marker:WaitForChild("Label")
+    Label.Text = Text
+    Label.TextColor3 = Color
+
+    -- 3) Drift up and to the right, 15-75 degrees from straight up
+    local Angle = AngleDeg or math.random(15, 75)
+    local AngleRad = math.rad(Angle)
+    local Magnitude = math.random(300, 500) / 100 -- 3 to 5 studs
+
+    -- Newer markers get a slightly more negative Z so they render in front of older ones
+    MarkerCounter = (MarkerCounter + 1) % 200
+    local ZBias = -MarkerCounter * 0.01
+    Marker.StudsOffset = Vector3.new(0, 0, ZBias)
+
+    local DriftEnd = Vector3.new(
+        math.sin(AngleRad) * Magnitude,
+        math.cos(AngleRad) * Magnitude,
+        ZBias
+    )
+
+    -- 4) Float and fade (slightly variable duration for natural feel)
+    local Duration = math.random(80, 100) / 100 -- 0.8 to 1.0 seconds
+    TweenService:Create(
+        Marker,
+        TweenInfo.new(Duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {StudsOffset = DriftEnd}
+    ):Play()
+    TweenService:Create(
+        Label,
+        TweenInfo.new(Duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1}
+    ):Play()
+
+    local Stroke = Label:FindFirstChildOfClass("UIStroke")
+    if Stroke then
+        TweenService:Create(
+            Stroke,
+            TweenInfo.new(Duration, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            {Transparency = 1}
+        ):Play()
+    end
+
+    -- 5) Cleanup
+    task.delay(Duration + 0.1, function()
+        Anchor:Destroy()
+    end)
+end
+
 local function DestroyTarget(InfoTable: table)
     local PlayerName = InfoTable.PlayerName
     local SlotName = InfoTable.SoldierData.Slot
@@ -333,6 +401,53 @@ local function DestroyTarget(InfoTable: table)
     end)
 end
 
+-- Computes the hit origin (2 studs toward the soldier from the target) and spawns damage markers
+local function SpawnHitmarkers(TargetModel: Model, SoldierModel: Model, SoldierType: string, Damage: number)
+    if not TargetModel or not TargetModel.PrimaryPart then return end
+    if Damage <= 0 then return end
+
+    -- Base position: above target, offset 4 studs toward soldier
+    local BasePos = TargetModel.PrimaryPart.Position + Vector3.new(0, 1, 0)
+    if SoldierModel and SoldierModel.PrimaryPart then
+        local ToSoldier = SoldierModel.PrimaryPart.Position - TargetModel.PrimaryPart.Position
+        ToSoldier = Vector3.new(ToSoldier.X, 0, ToSoldier.Z)
+        if ToSoldier.Magnitude > 0 then
+            BasePos += ToSoldier.Unit * 4
+        end
+    end
+
+    -- Shotguns distribute total damage across pellets
+    local WeaponInfo = SETTINGS.SOLDIER_DATA[SoldierType]["WeaponInfo"]
+    local WeaponType = SETTINGS.SOLDIER_DATA[SoldierType]["WeaponType"]
+
+    if WeaponType == "Shotgun" and WeaponInfo["Pellets"] then
+        local Pellets = WeaponInfo["Pellets"]
+        local Base = math.floor(Damage / Pellets)
+        local Remainder = Damage % Pellets
+
+        -- Build the list of pellets that will actually spawn
+        local PelletDamages = {}
+        for i = 1, Pellets do
+            local PelletDamage = Base + (i <= Remainder and 1 or 0)
+            if PelletDamage > 0 then
+                table.insert(PelletDamages, PelletDamage)
+            end
+        end
+
+        -- Divide 15-75 range into equal buckets, pick random angle within each
+        local Count = #PelletDamages
+        local BucketSize = 60 / Count
+        for i, PelletDamage in ipairs(PelletDamages) do
+            local BucketStart = 15 + (i - 1) * BucketSize
+            local BucketEnd = BucketStart + BucketSize
+            local Angle = BucketStart + math.random() * (BucketEnd - BucketStart)
+            SpawnMarker(BasePos, "-" .. tostring(PelletDamage), DAMAGE_COLOR, Angle)
+        end
+    else
+        SpawnMarker(BasePos, "-" .. tostring(Damage), DAMAGE_COLOR)
+    end
+end
+
 local function AnimateSoldiers(SoldiersToAnimate: table)
     for _, InfoTable in pairs(SoldiersToAnimate) do
         -- 1) Animate soldier
@@ -366,14 +481,17 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
         local TargetModel = Plot.Targets:FindFirstChild("Target" .. TargetSlot)
         local TargetType = TargetTypes[InfoTable.PlayerName]
 
+        local SoldierType = InfoTable.SoldierData.Type
         if CurrentHealth - Damage <= 0 and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].State == "Alive" then
             DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = true
             task.delay(TimeToHit, function()
+                SpawnHitmarkers(TargetModel, SoldierModel, SoldierType, Damage)
                 DestroyTarget(InfoTable)
                 DamageHealthBar(TargetModel, TargetType, CurrentHealth - Damage, true)
             end)
         else
             task.delay(TimeToHit, function()
+                SpawnHitmarkers(TargetModel, SoldierModel, SoldierType, Damage)
                 DamageHealthBar(TargetModel, TargetType, CurrentHealth - Damage, false)
             end)
         end

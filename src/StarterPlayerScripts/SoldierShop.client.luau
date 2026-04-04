@@ -193,7 +193,7 @@ local function UpdateTimer()
         local Minutes = math.floor(TimeRemaining / 60)
         local Seconds = TimeRemaining % 60
 
-        Timer.Text = "Stock resets in " .. string.format("%d:%02d", Minutes, Seconds)
+        Timer.Text = "STOCK RESETS IN " .. string.format("%d:%02d", Minutes, Seconds)
 
         task.wait(1)
     end
