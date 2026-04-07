@@ -1,0 +1,205 @@
+{
+  "main": {
+    "id": "a9dd98a333b6ce8c",
+    "type": "split",
+    "children": [
+      {
+        "id": "f9e8b26a7f672fc8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e8322c2122add13f",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Idea Resevoir.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Idea Resevoir"
+            }
+          },
+          {
+            "id": "d87a7595e4e3cba8",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Idea Resevoir.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Idea Resevoir"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "98e2e788f9390e11",
+    "type": "split",
+    "children": [
+      {
+        "id": "f65b744677762ebd",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4a86c96a2d341000",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "bf6ed514089818c4",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "3741fdc27ab8c486",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "02af69867f267532",
+    "type": "split",
+    "children": [
+      {
+        "id": "2f2b55864bcd0180",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5163f6774dcc4df0",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Pieces/Soldier Inventory.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Soldier Inventory"
+            }
+          },
+          {
+            "id": "bac8d1fd38e2a152",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Pieces/Soldier Inventory.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Soldier Inventory"
+            }
+          },
+          {
+            "id": "7b2acba84c3ee4c5",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "9c8a605e9a432500",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Pieces/Soldier Inventory.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Soldier Inventory"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false,
+      "obsidian-kanban:Create new board": false
+    }
+  },
+  "active": "d87a7595e4e3cba8",
+  "lastOpenFiles": [
+    "Debt Board.md",
+    "Concept.md",
+    "Idea Resevoir.md",
+    "Pieces/Upgrade Targets.md",
+    "Pieces/Soldier Shop.md",
+    "Pieces/Soldier Inventory.md",
+    "Pieces/Soldier Combat.md",
+    "Pieces/Plot Management.md",
+    "Pieces/Data Management.md",
+    "Pieces",
+    "Soldier/Target Combat.md",
+    "Soldier",
+    "Untitled.canvas",
+    "Untitled.base"
+  ]
+}

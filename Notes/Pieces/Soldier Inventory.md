@@ -1,0 +1,3 @@
+The soldier inventory is a simple UI the player can access at any time to manage their soldiers. Players can activate or deactivate any of their soldiers at any time. This is thanks to the soldier combat system running off a loop. The player can request to the server to activate or deactivate a soldier, all the server has to do is run security checks and then update the soldier timers.
+
+Soldiers are displayed in a grid on a scrolling frame, with an image of each soldier. When a soldier is selected, a green 'activated' label appears. Soldiers are displayed in power order, making it easy for players to select their best soldiers.

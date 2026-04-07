@@ -1,0 +1,3 @@
+As opposed to soldiers, who have an intricate and complex system of purchasing/selling/upgrading/merging, a player can upgrade their target incredibly simply. In each player's base there is a spot where the next target the player needs to unlock is displayed. Player can go over to this display, and step on a button to attempt to purchase the next target. Server runs checks, then notifies all clients / loops to update.
+
+Upgrading the next target should be a large deal. Targets have a variety of stats. A respawn time, health, and reward. This gives us the great opportunity to architect the scaling of difficulty for targets, which should get it's own note.

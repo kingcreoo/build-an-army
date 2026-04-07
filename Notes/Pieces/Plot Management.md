@@ -1,0 +1,3 @@
+Plots are for the most part client-primary for this game. The server does not create soldiers or targets, and especially does not create bullets. This creates a much more efficient server, and allows the client to decide if they want to animate other player's soldiers.
+
+For example, when a player tells the server they want to swap a soldier out, the server (which runs its verifications first) sends this to each client which replicates it on their own. The server creates no 3d parts in this example, it merely checks for security.
