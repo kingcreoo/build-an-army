@@ -3,6 +3,7 @@
 
 -- // Services
 local Players = game:GetService("Players")
+local MarketplaceService = game:GetService("MarketplaceService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -17,6 +18,7 @@ local GetStockFunction: RemoteFunction = Remotes:WaitForChild("GetStock")
 local RestockEvent: RemoteEvent = Remotes:WaitForChild("Restock")
 local PurchaseSoldierFunction: RemoteFunction = Remotes:WaitForChild("PurchaseSoldier")
 local UpdateInventoryBindable: BindableEvent = Remotes:WaitForChild("UpdateInventory")
+local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 
 local CurrentStock
 local TimeOfStock
@@ -36,6 +38,7 @@ local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
         Gradient.Parent = ViewTile
     end
     Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
+    Gradient.Rotation = 90
 end
 
 local LocalPlayer = Players.LocalPlayer
@@ -83,6 +86,50 @@ local function GetNextLogName(logParent: Frame)
 
     -- Return the next number (one less than the current lowest)
     return tostring(LowestNumber - 1) .. "Log"
+end
+
+-- Animates a buy log entry for a purchased soldier
+local function AnimateBuyLog(Type: string)
+    local SoldierData = SETTINGS.SOLDIER_DATA[Type]
+    if not SoldierData then return end
+
+    local Log = SoldierShopFrame:WaitForChild("Log")
+    local LogFrame: Frame = Log:WaitForChild("Template"):Clone()
+
+    LogFrame.ViewTile.Image.Image = SoldierData["Image"]
+    ApplyViewTileStyle(LogFrame.ViewTile, Type)
+    LogFrame.Parent = Log
+    LogFrame.Size = UDim2.fromScale(0, 0)
+    LogFrame.Name = GetNextLogName(Log)
+    LogFrame.Visible = true
+
+    local LogFrameTween = TweenService:Create(LogFrame, LogInfo, {Size = LogFrame:GetAttribute("StandardSize")})
+    LogFrameTween:Play()
+
+    LogFrameTween.Completed:Connect(function()
+        task.wait(3)
+
+        local ItemsToFadeOut = {LogFrame:WaitForChild("ViewTile"), LogFrame:WaitForChild("ViewTile"):WaitForChild("Image"), LogFrame:WaitForChild("ViewTile"):WaitForChild("UIStroke"), LogFrame:WaitForChild("TextLabel"), LogFrame:WaitForChild("TextLabel"):WaitForChild("UIStroke")}
+        for _, Overlay in pairs(LogFrame:WaitForChild("ViewTile"):WaitForChild("Overlay"):WaitForChild("Frame"):GetChildren()) do
+            table.insert(ItemsToFadeOut, Overlay)
+        end
+
+        for _, Item in pairs(ItemsToFadeOut) do
+            if Item:IsA("ImageLabel") then
+                TweenService:Create(Item, LogExitInfo, {ImageTransparency = 1}):Play()
+            elseif Item:IsA("Frame") then
+                TweenService:Create(Item, LogExitInfo, {BackgroundTransparency = 1}):Play()
+            elseif Item:IsA("UIStroke") then
+                TweenService:Create(Item, LogExitInfo, {Transparency = 1}):Play()
+            elseif Item:IsA("TextLabel") then
+                TweenService:Create(Item, LogExitInfo, {TextTransparency = 1}):Play()
+            end
+        end
+
+        task.wait(.7)
+
+        LogFrame:Destroy()
+    end)
 end
 
 local CDB = false
@@ -136,44 +183,8 @@ local function PressCreditsButton(SoldierFrame: Frame, Type: string)
         -- 2) Update inventory
         UpdateInventoryBindable:Fire(PlayerData)
 
-        -- 3) Animate
-        local Log = SoldierFrame.Parent.Parent.Parent:WaitForChild("Log")
-        local LogFrame: Frame = Log:WaitForChild("Template"):Clone()
-
-        LogFrame.ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[Type]["Image"]
-        ApplyViewTileStyle(LogFrame.ViewTile, Type)
-        LogFrame.Parent = Log
-        LogFrame.Size = UDim2.fromScale(0,0)
-        LogFrame.Name = GetNextLogName(Log)
-        LogFrame.Visible = true
-
-        local LogFrameTween = TweenService:Create(LogFrame, LogInfo, {Size = LogFrame:GetAttribute("StandardSize")})
-        LogFrameTween:Play()
-
-        LogFrameTween.Completed:Connect(function()
-            task.wait(3)
-
-            local ItemsToFadeOut = {LogFrame:WaitForChild("ViewTile"), LogFrame:WaitForChild("ViewTile"):WaitForChild("Image"), LogFrame:WaitForChild("ViewTile"):WaitForChild("UIStroke"), LogFrame:WaitForChild("TextLabel"), LogFrame:WaitForChild("TextLabel"):WaitForChild("UIStroke")}
-            for _, Overlay in pairs(LogFrame:WaitForChild("ViewTile"):WaitForChild("Overlay"):WaitForChild("Frame"):GetChildren()) do
-                table.insert(ItemsToFadeOut, Overlay)
-            end
-
-            for _, Item in pairs(ItemsToFadeOut) do
-                if Item:IsA("ImageLabel") then
-                    TweenService:Create(Item, LogExitInfo, {ImageTransparency = 1}):Play()
-                elseif Item:IsA("Frame") then
-                    TweenService:Create(Item, LogExitInfo, {BackgroundTransparency = 1}):Play()
-                elseif Item:IsA("UIStroke") then
-                    TweenService:Create(Item, LogExitInfo, {Transparency = 1}):Play()
-                elseif Item:IsA("TextLabel") then
-                    TweenService:Create(Item, LogExitInfo, {TextTransparency = 1}):Play()
-                end
-            end
-
-            task.wait(.7)
-
-            LogFrame:Destroy()
-        end)
+        -- 3) Animate buy log
+        AnimateBuyLog(Type)
 
     elseif Response == "Stock" or Response == "Insufficient" then
         NotifyBindable:Fire("Error purchasing, funds returned!", .8, Color3.fromRGB(255, 0, 0))
@@ -185,7 +196,7 @@ end
 
 local function UpdateTimer()
     while true do
-        local TimeRemaining = 180 - (os.time() - TimeOfStock)
+        local TimeRemaining = SETTINGS.STOCK_CONFIG.RotationSeconds - (os.time() - TimeOfStock)
         if TimeRemaining < 0 then
             TimeRemaining = 0
         end
@@ -274,6 +285,7 @@ local function InitializeStandardShop()
         local Data = SETTINGS.SOLDIER_DATA[Type]
         local SoldierFrame = TemplateFrame:Clone()
         SoldierFrame.Name = tostring(Num+1) .. Type
+        SoldierFrame.LayoutOrder = Num
 
         local MainFrame = SoldierFrame:WaitForChild("MainFrame")
         MainFrame:WaitForChild("Label").Text = string.upper(Type)
@@ -319,7 +331,13 @@ local function InitializeStandardShop()
 
 		RobuxButton.MouseButton1Click:Connect(function()
 			SOUND_MANAGER:PlayClick()
-			-- TODO: Implement Robux purchase logic
+			local ProductId = Data["RobuxProductId"]
+			if not ProductId or ProductId == 0 then
+				SOUND_MANAGER:PlayError()
+				warn("[SoldierShop] No RobuxProductId for " .. Type)
+				return
+			end
+			MarketplaceService:PromptProductPurchase(Players.LocalPlayer, ProductId)
 		end)
 
 		GiftButton.MouseButton1Click:Connect(function()
@@ -366,3 +384,43 @@ for _, Button in pairs(Buttons) do
         ButtonDeflateBindable:Fire(Button)
     end)
 end
+
+-- Build reverse map: ProductId -> soldier type name for Robux purchase log
+local ProductIdToSoldier = {}
+for SoldierName, Data in pairs(SETTINGS.SOLDIER_DATA) do
+    if Data["RobuxProductId"] then
+        ProductIdToSoldier[Data["RobuxProductId"]] = SoldierName
+    end
+end
+
+-- Listen for server data pushes (Robux purchases trigger LoadPlayerEvent with entry name)
+LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table, EntryName: string)
+    if not EntryName then return end
+
+    -- Check if this is a soldier Robux purchase by matching entry name pattern
+    local SoldierType = nil
+    for Name, _ in pairs(SETTINGS.SOLDIER_DATA) do
+        -- Entry names are like "GruntRobux", "SprayNPrayRobux", etc.
+        local CleanName = string.gsub(Name, "[%s'']", "")
+        if EntryName == CleanName .. "Robux" then
+            SoldierType = Name
+            break
+        end
+    end
+
+    if not SoldierType then return end
+
+    -- Only show buy log for soldiers in the shop (not premium store exclusives)
+    local InShop = false
+    for _, Name in ipairs(SETTINGS.SHOP_ORDER) do
+        if Name == SoldierType then
+            InShop = true
+            break
+        end
+    end
+
+    if InShop then
+        SOUND_MANAGER:PlayPurchase()
+        AnimateBuyLog(SoldierType)
+    end
+end)
