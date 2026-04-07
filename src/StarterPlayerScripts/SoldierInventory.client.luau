@@ -75,6 +75,7 @@ local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
         Gradient.Parent = ViewTile
     end
     Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
+    Gradient.Rotation = 90
 end
 
 local function IsSoldierActive(ActiveSoldiers, SoldierID)
@@ -91,8 +92,16 @@ local function CreateFrame(SoldierID, SoldierData, PlayerData)
     local ViewTile = SoldierFrame:WaitForChild("ViewTile")
     local Button: TextButton = SoldierFrame:WaitForChild("Button")
     local SoldierType = SoldierData["Type"]
-    
-    ViewTile.Image.Image = SETTINGS.SOLDIER_DATA[SoldierType]["Image"]
+
+    -- Guard against stale soldier types from old save data
+    local Stats = SETTINGS.SOLDIER_DATA[SoldierType]
+    if not Stats then
+        warn("[SoldierInventory] Unknown soldier type: " .. tostring(SoldierType) .. ", skipping")
+        SoldierFrame:Destroy()
+        return nil
+    end
+
+    ViewTile.Image.Image = Stats["Image"]
     ApplyViewTileStyle(ViewTile, SoldierType)
     SoldierFrame.Name = SoldierID
 

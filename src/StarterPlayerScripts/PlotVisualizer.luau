@@ -709,7 +709,13 @@ function PlotVisualizer.SetSoldier(Player: Player, SlotNumber: string, SoldierID
     end
     SoldierModel:SetPrimaryPartCFrame(Plot:WaitForChild("SoldierSlots"):WaitForChild(SlotNumber).CFrame * CFrame.Angles(0, math.rad(-90), 0) + Vector3.new(0,2.5,0))
     SoldierModel.Parent = Plot:WaitForChild("Soldiers")
-    local WeaponType = SETTINGS.SOLDIER_DATA[SoldierData.Type]["Weapon"]
+    local SoldierStats = SETTINGS.SOLDIER_DATA[SoldierData.Type]
+    if not SoldierStats then
+        warn("[PlotVisualizer] Unknown soldier type: " .. tostring(SoldierData.Type) .. ", skipping")
+        SoldierModel:Destroy()
+        return
+    end
+    local WeaponType = SoldierStats["Weapon"]
     local _, WeaponParts = EquipWeapon(SoldierModel, WeaponType)
 
     for _, Part in pairs(WeaponParts) do
@@ -745,7 +751,8 @@ function PlotVisualizer.SetTarget(Player: Player, UnlockedLanes: table, TargetTy
 
     -- 1) Define variables
     local Plot = Workspace:WaitForChild("Plots"):WaitForChild(Player.Name)
-    local TargetModelType = TargetModels:WaitForChild(TargetType)
+    local ModelName = SETTINGS["TARGET_DATA"][TargetType]["Model"]
+    local TargetModelType = TargetModels:WaitForChild(ModelName)
 
     -- 2) Remove existing targets
     local ExistingTargetType = TargetTypes[Player.Name]

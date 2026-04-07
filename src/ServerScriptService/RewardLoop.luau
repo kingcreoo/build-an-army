@@ -313,7 +313,9 @@ function RewardLoop.Init()
                 end
 
                 -- 1) Get soldier's base stats
-                local BaseFireRate = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponInfo"]["FireRate"]
+                local SoldierStats = SETTINGS["SOLDIER_DATA"][SoldierData.Type]
+                if not SoldierStats then continue end
+                local BaseFireRate = SoldierStats["WeaponInfo"]["FireRate"]
 
                 -- 2) Get any boosts
                 -- TODO get boosts

@@ -21,6 +21,22 @@ local Rewards = {}
 
 -- // Local Functions
 
+-- Computes how many damage-dealing bullets a soldier fires per trigger pull
+-- Mirrors RewardLoop's weapon type branching so online/offline rates match.
+-- Shotgun is treated as a slug server-side (Pellets is visual-only), so it returns 1.
+local function GetBulletsPerShot(SoldierStats: table): number
+    local WeaponType = SoldierStats["WeaponType"]
+    local WeaponInfo = SoldierStats["WeaponInfo"]
+
+    if WeaponType == "Burst" then
+        return WeaponInfo["Bullets"] or 1
+    elseif WeaponType == "Dual" then
+        return 2
+    end
+
+    return 1
+end
+
 local function CalculateRewards(PlayerData: table, TimeAway: number)
     local TotalPossibleRewards = 0
 
@@ -43,10 +59,17 @@ local function CalculateRewards(PlayerData: table, TimeAway: number)
 
         if SoldierData then
             local SoldierStats = Settings["SOLDIER_DATA"][SoldierData["Type"]]
+            if not SoldierStats then
+                warn("[IdleRewards] Unknown soldier type: " .. tostring(SoldierData["Type"]) .. ", skipping")
+                continue
+            end
             local WeaponInfo = SoldierStats["WeaponInfo"]
 
+            -- Account for multi-bullet weapons (Burst fires N, Dual fires 2)
+            local EffectiveDamage = WeaponInfo["Damage"] * GetBulletsPerShot(SoldierStats)
+
             -- Calculate how many shots to kill the target
-            local ShotsToKill = math.ceil(TargetHealth / WeaponInfo["Damage"])
+            local ShotsToKill = math.ceil(TargetHealth / EffectiveDamage)
 
             -- Time when the last bullet fires
             local LastShotTime = (ShotsToKill - 1) * WeaponInfo["FireRate"]
@@ -89,24 +112,18 @@ function IdleRewards.OnPlayerAdded(Player: Player, PlayerData: table)
     local CurrentTime = os.time()
     local RawTimeAway = CurrentTime - LogOffTime
 
-    -- If player was away for less than a minute we do not calculate rewards
-    if RawTimeAway < 60 then return end
+    -- If player was away for less than the minimum threshold, skip
+    if RawTimeAway < Settings.IDLE_CONFIG.MinTimeAway then return end
 
-    -- 2a) Clamp player's away time to VIP or non-VIP maximum
-    local HasVIP = false -- TODO check VIP
-    local MaxTime
-    if HasVIP then
-        MaxTime = 259200
-    else
-        MaxTime = 172800
-    end
+    -- 2a) Clamp player's away time to Commander or free-tier cap
+    local HasVIP = false -- TODO check Commander Pass ownership via TransactionManager
+    local MaxTime = HasVIP and Settings.IDLE_CONFIG.CommanderCap or Settings.IDLE_CONFIG.FreeCap
     local ClampedTimeAway = math.min(RawTimeAway, MaxTime)
 
-    -- 3) Calculate rewards
+    -- 3) Calculate raw live-equivalent rewards, then apply idle rate multiplier
     local PlayerRewards = CalculateRewards(PlayerData, ClampedTimeAway)
-    if not HasVIP then
-        PlayerRewards = math.floor(PlayerRewards / 2)
-    end
+    local RateMultiplier = HasVIP and Settings.IDLE_CONFIG.CommanderRate or Settings.IDLE_CONFIG.FreeRate
+    PlayerRewards = math.floor(PlayerRewards * RateMultiplier)
 
     -- 4) Store player's rewards in the rewards table
     Rewards[Player.Name] = PlayerRewards
