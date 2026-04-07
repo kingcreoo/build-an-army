@@ -343,10 +343,20 @@ for _, SoldierName in ipairs(SETTINGS.PREMIUM_ORDER) do
 	if PurchaseBtn then ApplyProductAttributes(PurchaseBtn, ProductId, "DevProduct") end
 end
 
+local PassesPurchases = PassesPane:WaitForChild("Purchases")
+local CommanderPassFrame = PassesPurchases:FindFirstChild("CommanderPass")
+if CommanderPassFrame and SETTINGS.COMMANDER_PASS and SETTINGS.COMMANDER_PASS.ProductId then
+	local ProductId = SETTINGS.COMMANDER_PASS.ProductId
+	local ImageBtn = CommanderPassFrame:FindFirstChild("Button")
+	local PurchaseBtn = CommanderPassFrame:FindFirstChild("Purchase")
+	if ImageBtn and ImageBtn:IsA("GuiButton") then ApplyProductAttributes(ImageBtn, ProductId, "Gamepass") end
+	if PurchaseBtn and PurchaseBtn:IsA("GuiButton") then ApplyProductAttributes(PurchaseBtn, ProductId, "Gamepass") end
+end
+
 -- Wire purchase buttons in each pane
 TRANSACTION_CLIENT.BindDescendants(CashPurchases)
 TRANSACTION_CLIENT.BindDescendants(SoldierPurchases)
-TRANSACTION_CLIENT.BindDescendants(PassesPane:WaitForChild("Purchases"))
+TRANSACTION_CLIENT.BindDescendants(PassesPurchases)
 
 -- Wire hover expand on all interactive buttons inside each pane's Purchases folder
 local function BindPurchaseHover(PurchasesFolder: Folder)
@@ -374,7 +384,7 @@ end
 
 BindPurchaseHover(CashPane:WaitForChild("Purchases"))
 BindPurchaseHover(SoldierPane:WaitForChild("Purchases"))
-BindPurchaseHover(PassesPane:WaitForChild("Purchases"))
+BindPurchaseHover(PassesPurchases)
 
 -- Setup hover pulse animations on each nav frame
 for _, Frame in pairs(AllFrames) do

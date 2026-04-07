@@ -220,7 +220,7 @@ return {
 
     CommanderPass = {
         Type = "Gamepass",
-        Id = 0, -- TODO: replace with real gamepass ID
+        Id = SETTINGS.COMMANDER_PASS.ProductId,
         OnGrant = function(Player: Player, PlayerData: table)
             -- One-time unlock of slot 7 for commander pass owners
             PlayerData.Plot.Unlocks.Slot7 = true

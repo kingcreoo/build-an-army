@@ -191,6 +191,7 @@ local function ApplyGamepassGrant(Player: Player, Entry: table): boolean
 
     PlayerData.Transactions.AppliedPasses[Entry.Name] = true
     Data.Set(Player, PlayerData)
+    LoadPlayerEvent:FireClient(Player, PlayerData, Entry.Name)
     return true
 end
 

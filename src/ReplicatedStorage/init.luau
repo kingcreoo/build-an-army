@@ -607,6 +607,11 @@ SETTINGS.STARTER_PACK = {
     ["OfferSeconds"] = 180
 }
 
+SETTINGS.COMMANDER_PASS = {
+    ["ProductId"] = 1788631710,
+    ["RobuxPrice"] = 199
+}
+
 -- Premium soldier passive boosts — applied at runtime when the player owns the soldier
 SETTINGS.PREMIUM_BOOSTS = {
     ["Hyper Sniper"] = {["CashMultiplier"] = 1.2},

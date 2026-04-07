@@ -13,13 +13,23 @@ local LocalPlayer = Players.LocalPlayer
 local SOUND_MANAGER = nil
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
 
+local function GetClickableButton(Target: Instance): GuiButton
+    if Target:IsA("GuiButton") then
+        return Target
+    end
+
+    return Target:WaitForChild("Button") :: GuiButton
+end
+
 local HUD: ScreenGui = LocalGui:WaitForChild("HUD")
 local SoldiersButton: TextButton = HUD:WaitForChild("Soldiers")
-local StoreButton: TextButton = HUD:WaitForChild("Store")
 local SettingsButton: TextButton = HUD:WaitForChild("Settings")
 local CreditsButton: TextButton = HUD:WaitForChild("CreditsButton")
 local CreditsText: TextLabel = HUD:WaitForChild("CreditsText")
-local AdContainer: Frame = HUD:WaitForChild("AdContainer")
+local StoreContainer: GuiObject = HUD:WaitForChild("Store")
+local CommanderPassHUD: GuiObject = HUD:WaitForChild("CommanderPass")
+local StoreButton: GuiButton = GetClickableButton(StoreContainer)
+local CommanderPassHUDButton: GuiButton = GetClickableButton(CommanderPassHUD)
 
 local FramesGui: ScreenGui = LocalGui:WaitForChild("Frames")
 local SoldierShopFrame: Frame = FramesGui:WaitForChild("SoldierShop")
@@ -29,6 +39,7 @@ local UpgradeTargetFrame: Frame = FramesGui:WaitForChild("UpgradeTargetFrame")
 local SellSoldiersFrame: Frame = FramesGui:WaitForChild("SellSoldiersFrame")
 local UnlockSlotFrame: Frame = FramesGui:WaitForChild("UnlockSlotFrame")
 local StarterPackFrame: Frame = FramesGui:WaitForChild("StarterPackFrame")
+local CommanderPassFrame: Frame = FramesGui:WaitForChild("CommanderPassFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
@@ -43,8 +54,14 @@ local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame,
 local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false, UnlockSlotFrame = false}
 
 local HUDButtons = {SoldiersButton}
-local HUDButtonsPulse = {StoreButton, SettingsButton, CreditsButton, AdContainer}
-local HUDElements = {SoldiersButton, SettingsButton, AdContainer, StoreButton, CreditsButton, CreditsText}
+local HUDButtonsPulse = {StoreContainer, SettingsButton, CreditsButton, CommanderPassHUD}
+local HUDElements = {SoldiersButton, SettingsButton, StoreContainer, CreditsButton, CreditsText, CommanderPassHUD}
+
+for _, Element in ipairs(HUDElements) do
+    if Element:IsA("GuiObject") and not Element:GetAttribute("OriginSize") then
+        Element:SetAttribute("OriginSize", Element.Size)
+    end
+end
 
 local ExpansionTweenInfo = TweenInfo.new(.25, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 local DeflationTweenInfo = TweenInfo.new(.075, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
@@ -60,9 +77,11 @@ local ButtonDeflateBindable: BindableEvent = Remotes:WaitForChild("ButtonDeflate
 local CloseFrameBindable: BindableEvent = Remotes:WaitForChild("CloseFrame")
 local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
 local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
+local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local OpenStoreBindable: BindableEvent = Remotes:WaitForChild("OpenStoreBindable")
 local HUDBindable: BindableEvent = Remotes:WaitForChild("HUDBindable")
 local StarterPackEvent: RemoteEvent = Remotes:WaitForChild("StarterPackEvent")
+local CommanderPassEvent: RemoteEvent = Remotes:WaitForChild("CommanderPassEvent")
 
 local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
@@ -75,9 +94,12 @@ local HUDActive = nil
 
 local SBD = false
 local StarterPackOpenDebounce = false
+local CommanderPassOpenDebounce = false
 
 local StarterPackCloseButton: TextButton = StarterPackFrame:WaitForChild("Close")
 local StarterPackPurchaseButton: TextButton = StarterPackFrame:WaitForChild("Purchase")
+local CommanderPassCloseButton: TextButton = CommanderPassFrame:WaitForChild("Close")
+local CommanderPassPurchaseButton: TextButton = CommanderPassFrame:WaitForChild("Purchase")
 
 -- // Functions
 
@@ -225,6 +247,48 @@ local function OpenStarterPackFrame()
     end)
 end
 
+local function CloseCommanderPassFrame(NotifyServer: boolean)
+    local CloseTween = TweenService:Create(CommanderPassFrame, CloseTweenInfo, {Size = UDim2.fromScale(0, 0)})
+    CloseTween:Play()
+    ActiveFrame = nil
+
+    if NotifyServer then
+        CommanderPassEvent:FireServer("Closed")
+    end
+
+    CloseTween.Completed:Connect(function()
+        CommanderPassFrame.Visible = false
+        task.delay(.1, OpenHUD)
+    end)
+end
+
+local function OpenCommanderPassFrame()
+    if CommanderPassOpenDebounce then return end
+    CommanderPassOpenDebounce = true
+
+    if ActiveFrame and ActiveFramePriority then
+        CommanderPassOpenDebounce = false
+        return
+    elseif ActiveFrame and ActiveFrame ~= CommanderPassFrame and not ActiveFramePriority then
+        local AnimationTime = CloseFrame(ActiveFrame, true)
+        task.wait(AnimationTime)
+    elseif not ActiveFrame and HUDActive then
+        CloseHUD()
+    end
+
+    ActiveFrame = CommanderPassFrame
+    CommanderPassFrame.Size = UDim2.fromScale(0, 0)
+    CommanderPassFrame.Visible = true
+
+    local OriginSize = CommanderPassFrame:GetAttribute("OriginSize") or UDim2.fromScale(1, 1)
+    local OpenTween = TweenService:Create(CommanderPassFrame, OpenTweenInfo, {Size = OriginSize})
+    OpenTween:Play()
+
+    task.delay(.2, function()
+        CommanderPassOpenDebounce = false
+    end)
+end
+
 local function Notify(Message: string, Time: number, Color: Color3Value)
 	local Notification = TemplateNotification:Clone()
 	Notification.Text = Message
@@ -352,12 +416,10 @@ StoreButton.MouseButton1Click:Connect(function()
 	OpenStoreBindable:Fire("Passes")
 end)
 
--- AdContainer button opens store with Passes pane
-local AdContainerButton = AdContainer:WaitForChild("Button")
-AdContainerButton.MouseButton1Click:Connect(function()
+CommanderPassHUDButton.MouseButton1Click:Connect(function()
 	if not HUDActive then return end
 	SOUND_MANAGER:PlayClick()
-	OpenStoreBindable:Fire("Passes")
+	OpenCommanderPassFrame()
 end)
 
 if not StarterPackPurchaseButton:GetAttribute("OriginSize") then
@@ -403,6 +465,49 @@ StarterPackPurchaseButton.MouseButton1Click:Connect(function()
     MarketplaceService:PromptProductPurchase(LocalPlayer, SETTINGS.STARTER_PACK.ProductId)
 end)
 
+if not CommanderPassPurchaseButton:GetAttribute("OriginSize") then
+    CommanderPassPurchaseButton:SetAttribute("OriginSize", CommanderPassPurchaseButton.Size)
+end
+if not CommanderPassCloseButton:GetAttribute("OriginSize") then
+    CommanderPassCloseButton:SetAttribute("OriginSize", CommanderPassCloseButton.Size)
+end
+
+CommanderPassPurchaseButton.MouseEnter:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    ButtonExpand(CommanderPassPurchaseButton, 1.1)
+end)
+CommanderPassPurchaseButton.MouseLeave:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    ButtonDeflate(CommanderPassPurchaseButton)
+end)
+
+CommanderPassCloseButton.MouseEnter:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    ButtonExpand(CommanderPassCloseButton, 1.1)
+end)
+CommanderPassCloseButton.MouseLeave:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    ButtonDeflate(CommanderPassCloseButton)
+end)
+
+CommanderPassCloseButton.MouseButton1Click:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    SOUND_MANAGER:PlayClick()
+    CloseCommanderPassFrame(true)
+end)
+
+CommanderPassPurchaseButton.MouseButton1Click:Connect(function()
+    if not CommanderPassFrame.Visible then return end
+    SOUND_MANAGER:PlayClick()
+
+    if not SETTINGS.COMMANDER_PASS.ProductId or SETTINGS.COMMANDER_PASS.ProductId == 0 then
+        SOUND_MANAGER:PlayError()
+        return
+    end
+
+    MarketplaceService:PromptGamePassPurchase(LocalPlayer, SETTINGS.COMMANDER_PASS.ProductId)
+end)
+
 ButtonExpandBindable.Event:Connect(ButtonExpand)
 ButtonDeflateBindable.Event:Connect(ButtonDeflate)
 CloseFrameBindable.Event:Connect(CloseFrame)
@@ -422,6 +527,24 @@ StarterPackEvent.OnClientEvent:Connect(function(Action: string)
         if StarterPackFrame.Visible then
             CloseStarterPackFrame(false)
         end
+    end
+end)
+
+CommanderPassEvent.OnClientEvent:Connect(function(Action: string)
+    if Action == "Open" then
+        OpenCommanderPassFrame()
+    elseif Action == "Close" then
+        if CommanderPassFrame.Visible then
+            CloseCommanderPassFrame(false)
+        end
+    end
+end)
+
+LoadPlayerEvent.OnClientEvent:Connect(function(_: table, EntryName: string?)
+    if EntryName == "StarterPack" and StarterPackFrame.Visible then
+        CloseStarterPackFrame(false)
+    elseif EntryName == "CommanderPass" and CommanderPassFrame.Visible then
+        CloseCommanderPassFrame(false)
     end
 end)
 
@@ -502,6 +625,7 @@ IdleRewardsClaimButton.MouseButton1Click:Connect(function()
 end)
 
 StarterPackFrame.Visible = false
+CommanderPassFrame.Visible = false
 
 -- Animation stuff
 

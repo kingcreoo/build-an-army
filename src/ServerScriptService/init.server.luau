@@ -26,6 +26,8 @@ local RecentPurchases = {}
 local SessionStartTimes = {}
 local StarterPackOpenStates = {}
 local StarterPackTouchCooldowns = {}
+local CommanderPassOpenStates = {}
+local CommanderPassTouchCooldowns = {}
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
@@ -48,6 +50,7 @@ local GetStockFunction: RemoteFunction = Remotes:WaitForChild("GetStock")
 local PurchaseSoldierFunction: RemoteFunction = Remotes:WaitForChild("PurchaseSoldier")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
 local StarterPackEvent: RemoteEvent = EnsureRemoteEvent("StarterPackEvent")
+local CommanderPassEvent: RemoteEvent = EnsureRemoteEvent("CommanderPassEvent")
 local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSoldier")
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
@@ -110,6 +113,18 @@ local function RemoveStarterPackPart(Player: Player)
     end
 end
 
+local function RemoveCommanderPassPart(Player: Player)
+    local PlotManager = PlayerPlotManagers[Player.Name]
+    if not PlotManager or not PlotManager.Plot then
+        return
+    end
+
+    local CommanderPassPart = PlotManager.Plot:FindFirstChild("CommanderPass")
+    if CommanderPassPart then
+        CommanderPassPart:Destroy()
+    end
+end
+
 -- Returns true when the player should still see the starter pack offer
 local function CanShowStarterPack(Player: Player, PlayerData: table): boolean
     if not PlayerData then
@@ -121,6 +136,10 @@ local function CanShowStarterPack(Player: Player, PlayerData: table): boolean
     end
 
     return GetCurrentPlayTime(Player, PlayerData) < SETTINGS.STARTER_PACK.OfferSeconds
+end
+
+local function CanShowCommanderPass(Player: Player): boolean
+    return not TransactionManager.IsPassOwned(Player, "CommanderPass")
 end
 
 -- Manages the starter pack timer and touch-open flow for a player's plot
@@ -187,6 +206,69 @@ local function SetupStarterPack(Player: Player)
             if TimerText and (TimerText:IsA("TextLabel") or TimerText:IsA("TextBox")) then
                 local RemainingSeconds = math.max(0, SETTINGS.STARTER_PACK.OfferSeconds - GetCurrentPlayTime(Player, PlayerData))
                 TimerText.Text = FormatStarterPackTime(RemainingSeconds)
+            end
+
+            task.wait(1)
+        end
+    end)
+end
+
+local function SetupCommanderPass(Player: Player)
+    local PlotManager = PlayerPlotManagers[Player.Name]
+    if not PlotManager or not PlotManager.Plot then
+        return
+    end
+
+    local CommanderPassPart = PlotManager.Plot:FindFirstChild("CommanderPass")
+    if not CommanderPassPart then
+        return
+    end
+
+    if not CanShowCommanderPass(Player) then
+        RemoveCommanderPassPart(Player)
+        return
+    end
+
+    CommanderPassPart.Touched:Connect(function(Hit)
+        local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
+        if not Humanoid then return end
+
+        local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
+        if HitPlayer ~= Player then return end
+
+        if not CanShowCommanderPass(Player) then
+            if CommanderPassOpenStates[Player.Name] then
+                CommanderPassEvent:FireClient(Player, "Close")
+                CommanderPassOpenStates[Player.Name] = false
+            end
+            RemoveCommanderPassPart(Player)
+            return
+        end
+
+        if CommanderPassOpenStates[Player.Name] then return end
+
+        local CooldownUntil = CommanderPassTouchCooldowns[Player.Name] or 0
+        if os.clock() < CooldownUntil then return end
+
+        CommanderPassOpenStates[Player.Name] = true
+        CommanderPassEvent:FireClient(Player, "Open")
+    end)
+
+    task.spawn(function()
+        while Player.Parent do
+            if not CanShowCommanderPass(Player) then
+                if CommanderPassOpenStates[Player.Name] then
+                    CommanderPassEvent:FireClient(Player, "Close")
+                    CommanderPassOpenStates[Player.Name] = false
+                end
+                RemoveCommanderPassPart(Player)
+                break
+            end
+
+            local CurrentPlotManager = PlayerPlotManagers[Player.Name]
+            local CurrentPart = CurrentPlotManager and CurrentPlotManager.Plot and CurrentPlotManager.Plot:FindFirstChild("CommanderPass")
+            if not CurrentPart then
+                break
             end
 
             task.wait(1)
@@ -428,7 +510,10 @@ local function OnPlayerAdded(Player: Player)
     -- 7) Setup starter pack timer/ad on the player's plot
     SetupStarterPack(Player)
 
-    -- 8) TODO Present player's offline earnings
+    -- 8) Setup commander pass ad on the player's plot
+    SetupCommanderPass(Player)
+
+    -- 9) TODO Present player's offline earnings
     LoadPlayerEvent:FireClient(Player, PlayerData)
 end
 
@@ -458,6 +543,8 @@ local function OnPlayerRemoving(Player: Player)
     SessionStartTimes[Player.Name] = nil
     StarterPackOpenStates[Player.Name] = nil
     StarterPackTouchCooldowns[Player.Name] = nil
+    CommanderPassOpenStates[Player.Name] = nil
+    CommanderPassTouchCooldowns[Player.Name] = nil
 end
 
 local function UpdateSetting(Player: Player, Item: string)
@@ -653,6 +740,15 @@ StarterPackEvent.OnServerEvent:Connect(function(Player: Player, Action: string)
 
     StarterPackOpenStates[Player.Name] = false
     StarterPackTouchCooldowns[Player.Name] = os.clock() + 7
+end)
+
+CommanderPassEvent.OnServerEvent:Connect(function(Player: Player, Action: string)
+    if Action ~= "Closed" then
+        return
+    end
+
+    CommanderPassOpenStates[Player.Name] = false
+    CommanderPassTouchCooldowns[Player.Name] = os.clock() + 7
 end)
 
 -- Returns player data, waiting until it is loaded if needed
