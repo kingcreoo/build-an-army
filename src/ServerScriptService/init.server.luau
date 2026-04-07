@@ -14,6 +14,7 @@ local Plot = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Pl
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 local IdleRewards = require(ServerScriptService:WaitForChild("Server"):WaitForChild("IdleRewards"))
+local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
 
 -- // Variables
 local Anchors = Workspace:WaitForChild("Anchors")
@@ -110,9 +111,15 @@ local function AutoEquip(Player: Player)
     return true
 end
 
+-- Resolves which visual model to clone for a given soldier type (falls back to type name if no Model field)
+local function ResolveSoldierModel(Type: string): string
+    local SoldierEntry = SETTINGS.SOLDIER_DATA[Type]
+    return (SoldierEntry and SoldierEntry.Model) or Type
+end
+
 local function CreateSoldier(Type: string)
     local SoldierID = HttpService:GenerateGUID()
-    local SoldierData = {["Model"] = Type, ["Type"] = Type}
+    local SoldierData = {["Model"] = ResolveSoldierModel(Type), ["Type"] = Type}
 
     return SoldierID, SoldierData
 end
@@ -121,7 +128,7 @@ local function InjectSoldier(Player: Player, Type: string)
     local PlayerData = Data.Get(Player)
 
     local SoldierID = HttpService:GenerateGUID()
-    local SoldierData = {["Model"] = Type, ["Type"] = Type}
+    local SoldierData = {["Model"] = ResolveSoldierModel(Type), ["Type"] = Type}
 
     PlayerData["Inventory"]["SoldierInventory"][SoldierID] = SoldierData
     Data.Set(Player, PlayerData)
@@ -178,8 +185,14 @@ local function PurchaseTarget(Player: Player)
 end
 
 local function PurchaseSoldier(Player: Player, Type: string)
+    -- 0) Reject unknown types and premium soldiers (premiums go through Robux only)
+    local SoldierEntry = SETTINGS["SOLDIER_DATA"][Type]
+    if not SoldierEntry or SoldierEntry["Special"] then
+        return "Invalid"
+    end
+
     -- 1) Check if the soldier is in stock for this player
-    if CurrentStock[Type] <= 0 then return "Stock" end
+    if not CurrentStock[Type] or CurrentStock[Type] <= 0 then return "Stock" end
 
     if not RecentPurchases[Player.Name] then
         RecentPurchases[Player.Name] = {}
@@ -272,7 +285,10 @@ local function OnPlayerAdded(Player: Player)
     -- 5) Run AutoEquip in case inventory changed while offline
     AutoEquip(Player)
 
-    -- 6) TODO Present player's offline earnings
+    -- 6) Apply any gamepass grants the player owns but hasn't had processed yet
+    TransactionManager.OnPlayerAdded(Player)
+
+    -- 7) TODO Present player's offline earnings
     LoadPlayerEvent:FireClient(Player, PlayerData)
 end
 
@@ -408,6 +424,7 @@ end
 
 -- // Events & Calling
 RewardLoop.Init()
+TransactionManager.Initialize()
 Players.PlayerAdded:Connect(OnPlayerAdded)
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 
@@ -418,7 +435,7 @@ task.spawn(function()
 
         RestockEvent:FireAllClients(CurrentStock, TimeOfStock)
 
-        task.wait(180)
+        task.wait(SETTINGS.STOCK_CONFIG.RotationSeconds)
     end
 end)
 
