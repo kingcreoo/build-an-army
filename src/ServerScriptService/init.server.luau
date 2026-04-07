@@ -23,14 +23,31 @@ local PlayerPlotManagers = {}
 local CurrentStock
 local TimeOfStock
 local RecentPurchases = {}
+local SessionStartTimes = {}
+local StarterPackOpenStates = {}
+local StarterPackTouchCooldowns = {}
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+-- Ensures a RemoteEvent exists even when Studio hierarchy is managed manually
+local function EnsureRemoteEvent(Name: string): RemoteEvent
+    local Existing = Remotes:FindFirstChild(Name)
+    if Existing and Existing:IsA("RemoteEvent") then
+        return Existing
+    end
+
+    local Event = Instance.new("RemoteEvent")
+    Event.Name = Name
+    Event.Parent = Remotes
+    return Event
+end
 
 local UpdateSettingFunction: RemoteFunction = Remotes:WaitForChild("UpdateSetting")
 local RestockEvent: RemoteEvent = Remotes:WaitForChild("Restock")
 local GetStockFunction: RemoteFunction = Remotes:WaitForChild("GetStock")
 local PurchaseSoldierFunction: RemoteFunction = Remotes:WaitForChild("PurchaseSoldier")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
+local StarterPackEvent: RemoteEvent = EnsureRemoteEvent("StarterPackEvent")
 local ActivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("ActivateSoldier")
 local DeactivateSoldierFunction: RemoteFunction = Remotes:WaitForChild("DeactivateSoldier")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
@@ -56,6 +73,125 @@ local function Restock()
     RecentPurchases = {}
 
     return Stocks
+end
+
+-- Returns the player's saved playtime plus their current session time
+local function GetCurrentPlayTime(Player: Player, PlayerData: table): number
+    local SavedSeconds = 0
+    if PlayerData.Stats and type(PlayerData.Stats.PlayTimeSeconds) == "number" then
+        SavedSeconds = PlayerData.Stats.PlayTimeSeconds
+    end
+
+    local SessionStart = SessionStartTimes[Player.Name]
+    if not SessionStart then
+        return SavedSeconds
+    end
+
+    return SavedSeconds + math.max(0, os.time() - SessionStart)
+end
+
+-- Formats seconds into M:SS for the starter pack timer billboard
+local function FormatStarterPackTime(RemainingSeconds: number): string
+    local Minutes = math.floor(RemainingSeconds / 60)
+    local Seconds = RemainingSeconds % 60
+    return string.format("%d:%02d", Minutes, Seconds)
+end
+
+-- Removes the starter pack part from a player's plot if it exists
+local function RemoveStarterPackPart(Player: Player)
+    local PlotManager = PlayerPlotManagers[Player.Name]
+    if not PlotManager or not PlotManager.Plot then
+        return
+    end
+
+    local StarterPackPart = PlotManager.Plot:FindFirstChild("StarterPack")
+    if StarterPackPart then
+        StarterPackPart:Destroy()
+    end
+end
+
+-- Returns true when the player should still see the starter pack offer
+local function CanShowStarterPack(Player: Player, PlayerData: table): boolean
+    if not PlayerData then
+        return false
+    end
+
+    if PlayerData.Offers and PlayerData.Offers.StarterPackPurchased then
+        return false
+    end
+
+    return GetCurrentPlayTime(Player, PlayerData) < SETTINGS.STARTER_PACK.OfferSeconds
+end
+
+-- Manages the starter pack timer and touch-open flow for a player's plot
+local function SetupStarterPack(Player: Player)
+    local PlotManager = PlayerPlotManagers[Player.Name]
+    if not PlotManager or not PlotManager.Plot then
+        return
+    end
+
+    local StarterPackPart = PlotManager.Plot:FindFirstChild("StarterPack")
+    if not StarterPackPart then
+        return
+    end
+
+    local TimerGui = StarterPackPart:FindFirstChild("TimerGui")
+    local TimerText = TimerGui and TimerGui:FindFirstChild("Time")
+
+    StarterPackPart.Touched:Connect(function(Hit)
+        local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
+        if not Humanoid then return end
+
+        local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
+        if HitPlayer ~= Player then return end
+
+        local PlayerData = Data.Get(Player)
+        if not CanShowStarterPack(Player, PlayerData) then
+            if StarterPackOpenStates[Player.Name] then
+                StarterPackEvent:FireClient(Player, "Close")
+                StarterPackOpenStates[Player.Name] = false
+            end
+            RemoveStarterPackPart(Player)
+            return
+        end
+
+        if StarterPackOpenStates[Player.Name] then return end
+
+        local CooldownUntil = StarterPackTouchCooldowns[Player.Name] or 0
+        if os.clock() < CooldownUntil then return end
+
+        StarterPackOpenStates[Player.Name] = true
+        StarterPackEvent:FireClient(Player, "Open")
+    end)
+
+    task.spawn(function()
+        while Player.Parent do
+            local PlayerData = Data.Get(Player)
+            if not PlayerData then break end
+
+            if not CanShowStarterPack(Player, PlayerData) then
+                if StarterPackOpenStates[Player.Name] then
+                    StarterPackEvent:FireClient(Player, "Close")
+                    StarterPackOpenStates[Player.Name] = false
+                end
+                RemoveStarterPackPart(Player)
+                break
+            end
+
+            local CurrentPlotManager = PlayerPlotManagers[Player.Name]
+            local CurrentPart = CurrentPlotManager and CurrentPlotManager.Plot and CurrentPlotManager.Plot:FindFirstChild("StarterPack")
+            if not CurrentPart then
+                break
+            end
+
+            if TimerText and (TimerText:IsA("TextLabel") or TimerText:IsA("TextBox")) then
+                local RemainingSeconds = math.max(0, SETTINGS.STARTER_PACK.OfferSeconds - GetCurrentPlayTime(Player, PlayerData))
+                TimerText.Text = FormatStarterPackTime(RemainingSeconds)
+            end
+
+            task.wait(1)
+        end
+    end)
 end
 
 local function AutoEquip(Player: Player)
@@ -254,6 +390,7 @@ end
 local function OnPlayerAdded(Player: Player)
     -- 1) Load player's data
     local PlayerData, NewPlayer = Data.Initialize(Player)
+    SessionStartTimes[Player.Name] = os.time()
     print(Player.Name .. " has joined. Their data:")
     print(PlayerData)
 
@@ -288,13 +425,27 @@ local function OnPlayerAdded(Player: Player)
     -- 6) Apply any gamepass grants the player owns but hasn't had processed yet
     TransactionManager.OnPlayerAdded(Player)
 
-    -- 7) TODO Present player's offline earnings
+    -- 7) Setup starter pack timer/ad on the player's plot
+    SetupStarterPack(Player)
+
+    -- 8) TODO Present player's offline earnings
     LoadPlayerEvent:FireClient(Player, PlayerData)
 end
 
 local function OnPlayerRemoving(Player: Player)
     -- 0) Claim idle rewards if player never did
     IdleRewards.ClaimRewards(Player)
+
+    -- 0a) Persist playtime for this session before saving/removing data
+    local PlayerData = Data.Get(Player)
+    local SessionStart = SessionStartTimes[Player.Name]
+    if PlayerData and SessionStart then
+        if not PlayerData.Stats then
+            PlayerData.Stats = {}
+        end
+        PlayerData.Stats.PlayTimeSeconds = (PlayerData.Stats.PlayTimeSeconds or 0) + math.max(0, os.time() - SessionStart)
+        Data.Set(Player, PlayerData, true)
+    end
 
     -- 1) Remove player's data (save & write logoff details too)
     Data.Remove(Player)
@@ -304,6 +455,9 @@ local function OnPlayerRemoving(Player: Player)
     table.remove(OccupiedAnchors, table.find(OccupiedAnchors, PlayerPlot.Anchor))
     PlayerPlot:Cleanup()
     PlayerPlotManagers[Player.Name] = nil
+    SessionStartTimes[Player.Name] = nil
+    StarterPackOpenStates[Player.Name] = nil
+    StarterPackTouchCooldowns[Player.Name] = nil
 end
 
 local function UpdateSetting(Player: Player, Item: string)
@@ -490,6 +644,15 @@ end)
 UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
 	local Response, PlayerData = UnlockSlot(Player)
 	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
+end)
+
+StarterPackEvent.OnServerEvent:Connect(function(Player: Player, Action: string)
+    if Action ~= "Closed" then
+        return
+    end
+
+    StarterPackOpenStates[Player.Name] = false
+    StarterPackTouchCooldowns[Player.Name] = os.clock() + 7
 end)
 
 -- Returns player data, waiting until it is loaded if needed

@@ -11,7 +11,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 
-local DataStore = DataStoreService:GetDataStore("DataStore1239123111123121231")
+local DataStore = DataStoreService:GetDataStore("DataStore12123111231")
 
 local Database = {}
 
@@ -30,6 +30,21 @@ local function DeepCopy(Table: table)
     return Copy
 end
 
+-- Merges any missing default keys into loaded player data without overwriting values
+local function ApplyDefaults(Target: table, Defaults: table)
+    for K, V in pairs(Defaults) do
+        if Target[K] == nil then
+            if type(V) == "table" then
+                Target[K] = DeepCopy(V)
+            else
+                Target[K] = V
+            end
+        elseif type(Target[K]) == "table" and type(V) == "table" then
+            ApplyDefaults(Target[K], V)
+        end
+    end
+end
+
 -- Handle gathering player's data upon joining the game
 function Data.Initialize(Player: Player)
     local PlayerData
@@ -46,6 +61,8 @@ function Data.Initialize(Player: Player)
     if not PlayerData then
         PlayerData = DeepCopy(Settings.DEFAULT_DATA)
         NewPlayer = true
+    else
+        ApplyDefaults(PlayerData, Settings.DEFAULT_DATA)
     end
 
     Database[Player.Name] = PlayerData

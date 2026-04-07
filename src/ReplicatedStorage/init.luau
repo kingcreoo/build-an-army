@@ -31,6 +31,12 @@ SETTINGS.DEFAULT_DATA = {
     ["Transactions"] = {
         ["GrantedPurchases"] = {},
         ["AppliedPasses"] = {}
+    },
+    ["Stats"] = {
+        ["PlayTimeSeconds"] = 0
+    },
+    ["Offers"] = {
+        ["StarterPackPurchased"] = false
     }
 }
 
@@ -594,9 +600,11 @@ SETTINGS.CASH_PACKS = {
 
 -- Starter Pack bundle contents (Robux product)
 SETTINGS.STARTER_PACK = {
-    ["RobuxPrice"] = 50,
-    ["Soldiers"] = {"Sniper", "Spray 'n Pray"},
-    ["Credits"] = 500
+    ["ProductId"] = 3571909460,
+    ["RobuxPrice"] = 79,
+    ["Soldiers"] = {"Bandit", "Raider"},
+    ["Credits"] = 5000,
+    ["OfferSeconds"] = 180
 }
 
 -- Premium soldier passive boosts — applied at runtime when the player owns the soldier

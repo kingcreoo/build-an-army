@@ -2,6 +2,7 @@
 -- // Manages UI functions for the client :)
 
 -- // Services
+local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
@@ -27,6 +28,7 @@ local SettingsFrame: Frame = FramesGui:WaitForChild("SettingsFrame")
 local UpgradeTargetFrame: Frame = FramesGui:WaitForChild("UpgradeTargetFrame")
 local SellSoldiersFrame: Frame = FramesGui:WaitForChild("SellSoldiersFrame")
 local UnlockSlotFrame: Frame = FramesGui:WaitForChild("UnlockSlotFrame")
+local StarterPackFrame: Frame = FramesGui:WaitForChild("StarterPackFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
@@ -50,6 +52,7 @@ local OpenTweenInfo = TweenInfo.new(.3, Enum.EasingStyle.Quad, Enum.EasingDirect
 local CloseTweenInfo = TweenInfo.new(.1, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local ButtonExpandBindable: BindableEvent = Remotes:WaitForChild("ButtonExpand")
@@ -59,6 +62,7 @@ local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
 local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
 local OpenStoreBindable: BindableEvent = Remotes:WaitForChild("OpenStoreBindable")
 local HUDBindable: BindableEvent = Remotes:WaitForChild("HUDBindable")
+local StarterPackEvent: RemoteEvent = Remotes:WaitForChild("StarterPackEvent")
 
 local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
 local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
@@ -70,6 +74,10 @@ local ActiveFramePriority = nil
 local HUDActive = nil
 
 local SBD = false
+local StarterPackOpenDebounce = false
+
+local StarterPackCloseButton: TextButton = StarterPackFrame:WaitForChild("Close")
+local StarterPackPurchaseButton: TextButton = StarterPackFrame:WaitForChild("Purchase")
 
 -- // Functions
 
@@ -173,6 +181,48 @@ local function OpenFrame(Frame: Frame)
     Frame.Size = UDim2.fromScale(0,0)
     Frame.Visible = true
     OpenTween:Play()
+end
+
+local function CloseStarterPackFrame(NotifyServer: boolean)
+    local CloseTween = TweenService:Create(StarterPackFrame, CloseTweenInfo, {Size = UDim2.fromScale(0, 0)})
+    CloseTween:Play()
+    ActiveFrame = nil
+
+    if NotifyServer then
+        StarterPackEvent:FireServer("Closed")
+    end
+
+    CloseTween.Completed:Connect(function()
+        StarterPackFrame.Visible = false
+        task.delay(.1, OpenHUD)
+    end)
+end
+
+local function OpenStarterPackFrame()
+    if StarterPackOpenDebounce then return end
+    StarterPackOpenDebounce = true
+
+    if ActiveFrame and ActiveFramePriority then
+        StarterPackOpenDebounce = false
+        return
+    elseif ActiveFrame and ActiveFrame ~= StarterPackFrame and not ActiveFramePriority then
+        local AnimationTime = CloseFrame(ActiveFrame, true)
+        task.wait(AnimationTime)
+    elseif not ActiveFrame and HUDActive then
+        CloseHUD()
+    end
+
+    ActiveFrame = StarterPackFrame
+    StarterPackFrame.Size = UDim2.fromScale(0, 0)
+    StarterPackFrame.Visible = true
+
+    local OriginSize = StarterPackFrame:GetAttribute("OriginSize") or UDim2.fromScale(1, 1)
+    local OpenTween = TweenService:Create(StarterPackFrame, OpenTweenInfo, {Size = OriginSize})
+    OpenTween:Play()
+
+    task.delay(.2, function()
+        StarterPackOpenDebounce = false
+    end)
 end
 
 local function Notify(Message: string, Time: number, Color: Color3Value)
@@ -310,6 +360,49 @@ AdContainerButton.MouseButton1Click:Connect(function()
 	OpenStoreBindable:Fire("Passes")
 end)
 
+if not StarterPackPurchaseButton:GetAttribute("OriginSize") then
+    StarterPackPurchaseButton:SetAttribute("OriginSize", StarterPackPurchaseButton.Size)
+end
+if not StarterPackCloseButton:GetAttribute("OriginSize") then
+    StarterPackCloseButton:SetAttribute("OriginSize", StarterPackCloseButton.Size)
+end
+
+StarterPackPurchaseButton.MouseEnter:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    ButtonExpand(StarterPackPurchaseButton, 1.1)
+end)
+StarterPackPurchaseButton.MouseLeave:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    ButtonDeflate(StarterPackPurchaseButton)
+end)
+
+StarterPackCloseButton.MouseEnter:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    ButtonExpand(StarterPackCloseButton, 1.1)
+end)
+StarterPackCloseButton.MouseLeave:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    ButtonDeflate(StarterPackCloseButton)
+end)
+
+StarterPackCloseButton.MouseButton1Click:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    SOUND_MANAGER:PlayClick()
+    CloseStarterPackFrame(true)
+end)
+
+StarterPackPurchaseButton.MouseButton1Click:Connect(function()
+    if not StarterPackFrame.Visible then return end
+    SOUND_MANAGER:PlayClick()
+
+    if not SETTINGS.STARTER_PACK.ProductId or SETTINGS.STARTER_PACK.ProductId == 0 then
+        SOUND_MANAGER:PlayError()
+        return
+    end
+
+    MarketplaceService:PromptProductPurchase(LocalPlayer, SETTINGS.STARTER_PACK.ProductId)
+end)
+
 ButtonExpandBindable.Event:Connect(ButtonExpand)
 ButtonDeflateBindable.Event:Connect(ButtonDeflate)
 CloseFrameBindable.Event:Connect(CloseFrame)
@@ -320,6 +413,16 @@ HUDBindable.Event:Connect(function(Action: string)
 	elseif Action == "Open" then
 		OpenHUD(false)
 	end
+end)
+
+StarterPackEvent.OnClientEvent:Connect(function(Action: string)
+    if Action == "Open" then
+        OpenStarterPackFrame()
+    elseif Action == "Close" then
+        if StarterPackFrame.Visible then
+            CloseStarterPackFrame(false)
+        end
+    end
 end)
 
 SoldierShopPrompt.PromptShown:Connect(function()
@@ -397,6 +500,8 @@ IdleRewardsClaimButton.MouseButton1Click:Connect(function()
     ActiveFramePriority = false
     CloseFrame(IdleRewardsFrame)
 end)
+
+StarterPackFrame.Visible = false
 
 -- Animation stuff
 

@@ -90,17 +90,26 @@ return {
     },
 
     -- ============================================================
-    -- STARTER PACK — Sniper + Spray 'n Pray + bonus credits
+    -- STARTER PACK — Bandit + Raider + bonus credits (one-time forever)
     -- ============================================================
 
     StarterPack = {
         Type = "DevProduct",
-        Id = 0, -- TODO: replace with real product ID (target ~50 R$)
+        Id = SETTINGS.STARTER_PACK.ProductId,
         OnGrant = function(_: Player, PlayerData: table)
+            if not PlayerData.Offers then
+                PlayerData.Offers = {}
+            end
+
+            if PlayerData.Offers.StarterPackPurchased then
+                return
+            end
+
             for _, SoldierType in ipairs(SETTINGS.STARTER_PACK.Soldiers) do
                 GrantSoldier(PlayerData, SoldierType)
             end
             PlayerData.leaderstats.Credits += SETTINGS.STARTER_PACK.Credits
+            PlayerData.Offers.StarterPackPurchased = true
         end,
     },
 
