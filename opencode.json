@@ -1,0 +1,43 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode/claude-sonnet-4-6",
+  "small_model": "opencode/claude-haiku-4-5",
+  "instructions": ["DESIGN.md", "ROADMAP.md", "AUDIT.md"],
+  "permission": { "edit": "deny", "bash": "deny", "webfetch": "ask" },
+  "mcp": {
+    "roblox-docs": {
+      "type": "local",
+      "command": ["uvx", "mcp-roblox-docs"],
+      "enabled": true
+    }
+  },
+  "agent": {
+    "pair": {
+      "description": "Deliberation-only pair programmer.",
+      "mode": "primary",
+      "model": "opencode/claude-sonnet-4-6",
+      "temperature": 0.3,
+      "prompt": "{file:./prompts/pair.md}",
+      "permission": { "edit": "deny", "bash": "deny", "webfetch": "ask" },
+      "tools": {
+        "write": false, "edit": false, "patch": false, "multiedit": false,
+        "bash": false, "todowrite": false, "todoread": false,
+        "read": true, "grep": true, "glob": true, "list": true,
+        "webfetch": true, "websearch": true
+      }
+    },
+    "deep": {
+      "description": "Hard architecture call — Opus with high reasoning.",
+      "mode": "primary",
+      "model": "opencode/claude-opus-4-7",
+      "temperature": 0.2,
+      "reasoningEffort": "high",
+      "prompt": "{file:./prompts/pair.md}",
+      "permission": { "edit": "deny", "bash": "deny" },
+      "tools": {
+        "write": false, "edit": false, "patch": false, "multiedit": false,
+        "bash": false, "read": true, "grep": true, "glob": true
+      }
+    }
+  }
+}

@@ -1,77 +1,51 @@
-# AGENTS.md
+# CLAUDE.md
 
-Guidance for AI agents working in this repo.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Conventions
+## Required References
 
-- PascalCase for variables/functions, ALLCAPS for module references
-- Short clear comment above every function and critical block
-- Reusable functions over deep nesting
-- Always use PascalCase
-- Soldiers ONLY fire at the target in their lane
-- Keep responses short and concise
+**CLAUDE.md** Provides a clear guideline for technical details & specifics when working in this repo.
 
-## Project Structure
+**README.md** Provides a clear explanation of this game's core concept & an outline of some features. It speaks in the future tense about this game for when it is completed.
 
-- `ReplicatedFirst/` — Load screen (currently empty)
-- `ReplicatedStorage/init.luau` — SETTINGS module. Single source of truth for ALL game data
-- `ServerScriptService/` — Server scripts (combat loop, data, plots, transactions)
-- `StarterPlayerScripts/` — Client scripts + UI
-- `NOTES.md` — Scratchpad, free to use
-- All remotes live in `ReplicatedStorage.Remotes`
+**STUDIO.md** Provides an outline of where things are located in ROBLOX studio. This is updated by the human who manages claude and this repo whenever things are changed in studio, along with a git commit.
 
-## References
+## Code & comment conventions
 
-- **README.md** — Game concept + feature outline (future tense)
-- **TODO.md** — Task outlines. Located at `/home/creoo/Brain/build an army/TODO.md`
-- **Economy spreadsheet** — `/home/creoo/Downloads/build_an_army_economy_v6.xlsx` (6 sheets). Source of truth for economy numbers, but code values override where intentionally changed (e.g. cash pack prices are 29/59/109 R$ in code, not spreadsheet's 49/149/399)
+- PascalCase is always used for variables and functions
+- MODULES are in all caps
+- Prefer writing re-usable functions over deep nesting
 
-## Studio Hierarchy
+- Always provide a short, clear, and concise overview of a script at the first line
+- Always provide a short, clear, and concise one-line summary above each function
+- Always provide a short, clear, and concise one-line explanations over critical blocks in a function
 
-No static file. Collin pastes hierarchy dumps as needed. Don't assume GUI paths — ask or wait for a dump.
+## Project structure
 
-## Read-Only Directories
+"ReplicatedFirst" folder contains scripts that manage tasks that need to be completed immediately as the player loads in. (The only real thing here is the load screen.)
 
-- **Brain** (`/home/creoo/Brain`) — Obsidian vault. NEVER edit.
-- **shoot-the-enemy** — Old project, can read/copy from. NEVER edit.
+"ReplicatedStorage" folder contains scripts that are located in ReplicatedStorage that are shared between the client and server. The all important SETTINGS module is located here (at ReplicatedStorage/init.luau)
 
-## Testing
+The SETTINGS module, located at /src/ReplicatedStorage/init.luau, is the primary base for any kind of data that code may need to reference. This includes but is not limited to: data that new players are to be given or data on each soldier/target type.
 
-- TestEZ for luau testing: https://roblox.github.io/testez/
-- Collin tests in Roblox Studio. AI cannot test directly — always wait for test results before committing.
+"ServerScriptService" folder contains all server-sided scripts. (All located in the actual ServerScriptService folder in studio.)
 
-## Working State
+"StarterPlayerScripts" folder contains all client-sided scripts, including UI. (All located in the actual StarterPlayerScripts folder in studio.)
 
-### Uncommitted Changes (all untested)
-**Modified:** init.luau (SETTINGS), Data.luau, IdleRewards.luau, init.server.luau, PlotVisualizer.luau, RobuxStore.client.luau, SoldierShop.client.luau
-**New files:** TransactionManager.luau, ProductConfig.luau, TransactionClient.luau, NOTES.md
+NOTES.md is a file that you are always allowed to add notes into, whether that be a temporary to-do list or a piece of logic that you want to keep long term.
 
-### What Works
-- Combat loop, data persistence, plots, soldier shop + stock rotation
-- Inventory, selling, target upgrades, slot unlocks, idle rewards
-- Damage hitmarkers, sound system, AutoEquip
-- Economy data fully pushed (14 soldiers, 7 targets, all config tables)
+## Testing approach
 
-### What's Built but Untested
-- TransactionManager (Robux handler) — config-driven, idempotent, security-first
-- ProductConfig — 19 entries, all Id=0 (need real IDs from Creator Dashboard)
-- TransactionClient — client button-binding helper
-- RobuxStore refactor — fade transitions, new nav button structure
+For testing, we use a basic tool called TestEZ that allows for testing of ROBLOX's luau. Documentation for TestEZ: https://roblox.github.io/testez/
 
-### Blockers
-- **RobuxStore GUI**: Script expects specific hierarchy (Buttons.Cash Frame > Button, Panes folder, etc). Need Collin to update Studio and paste hierarchy dump.
-- **Product IDs**: All 0. Need Collin to create dev products/gamepasses in Creator Dashboard.
-- **Testing**: Everything uncommitted needs Studio testing before commit.
+## Roblox studio specifics
 
-### Known Design Decisions (don't "fix" these)
-- Shotgun = visual-pellet, server-slug. Pellets field is cosmetic only. Intentional.
-- 100M starting credits = testing value. Intentional.
-- Commander Pass scaffolded but NOT implemented. Don't add features without explicit instruction.
-- PREMIUM_BOOSTS table exists but nothing reads it yet. Don't wire it without instruction.
-- No EffMult field in code — handled structurally via WeaponType branching.
+The human who manages claude (and any other AI Agent) is constantly updating the STUDIO.md file as anything is updated (as previously mentioned). This file contains a map of all parts in the workspace, replicatedstorage, and even in the startergui. When you reference a part (for example: ReplicatedStorage.Types.Soldiers.Grunt) you can check inside of STUDIO.md to see where it's located.
 
-### Flow
-1. AI writes/fixes code
-2. Collin tests in Studio
-3. If it works, commit
-4. Repeat
+All remotes (RemoteEvents, RemoteFunctions, and bindables) are located in ReplicatedStorage.Remotes.
+
+You can always request that something be added into studio WHEN IN PLAN MODE.
+
+- Delete tasks after you are finished using them
+- Always use PascalCase.
+- Remember soldiers always ONLY fire at the target in their lane

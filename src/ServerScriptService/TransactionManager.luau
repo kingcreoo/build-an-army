@@ -5,8 +5,8 @@
     OVERVIEW
     --------
     Loads ProductConfig and wires up Roblox's purchase pipeline so every listed
-    product/gamepass grants automatically via its OnGrant callback. Safe to call
-    from anywhere; the client triggers prompts via MarketplaceService directly
+    product/gamepass grants automatically via its OnGrant callback. It is safe to call
+    from anywhere. The client triggers prompts via MarketplaceService directly
     (no remote events required).
 
     PUBLIC API

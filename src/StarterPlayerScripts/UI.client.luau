@@ -55,7 +55,7 @@ local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = f
 
 local HUDButtons = {SoldiersButton}
 local HUDButtonsPulse = {StoreContainer, SettingsButton, CreditsButton, CommanderPassHUD}
-local HUDElements = {SoldiersButton, SettingsButton, StoreContainer, CreditsButton, CreditsText, CommanderPassHUD}
+local HUDElements = {SoldiersButton, SettingsButton, CommanderPassHUD, StoreContainer, CreditsButton, CreditsText}
 
 for _, Element in ipairs(HUDElements) do
     if Element:IsA("GuiObject") and not Element:GetAttribute("OriginSize") then
@@ -91,6 +91,7 @@ local UnlockSlotsPrompt: ProximityPrompt = Workspace:WaitForChild("UnlockSlots")
 local ActiveFrame = nil
 local ActiveFramePriority = nil
 local HUDActive = nil
+local CommanderPassHidden = false
 
 local SBD = false
 local StarterPackOpenDebounce = false
@@ -152,13 +153,21 @@ end
 local function OpenHUD(Fast)
     if Fast then
         for _, Button in pairs(HUDElements) do
-            Button.Visible = true
+            if Button == CommanderPassHUD and CommanderPassHidden then
+                Button.Visible = false
+            else
+                Button.Visible = true
+            end
         end
         HUDActive = true
     else
         for _, Button in pairs(HUDElements) do
-            ButtonOpen(Button)
-            task.wait(.2)
+            if Button == CommanderPassHUD and CommanderPassHidden then
+                Button.Visible = false
+            else
+                ButtonOpen(Button)
+                task.wait(.2)
+            end
         end
         HUDActive = true
     end
@@ -545,6 +554,20 @@ LoadPlayerEvent.OnClientEvent:Connect(function(_: table, EntryName: string?)
         CloseStarterPackFrame(false)
     elseif EntryName == "CommanderPass" and CommanderPassFrame.Visible then
         CloseCommanderPassFrame(false)
+    end
+end)
+
+LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
+    local OwnsCommanderPass = false
+    if PlayerData.Plot and PlayerData.Plot.Unlocks then
+        OwnsCommanderPass = PlayerData.Plot.Unlocks.Slot7 == true
+    end
+
+    CommanderPassHidden = OwnsCommanderPass
+    if OwnsCommanderPass then
+        CommanderPassHUD.Visible = false
+    elseif HUDActive then
+        CommanderPassHUD.Visible = true
     end
 end)
 
