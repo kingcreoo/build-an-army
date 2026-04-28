@@ -20,28 +20,24 @@ Build an army is a simple, easy, aesthetically pleasing ROBLOX game. The player 
 - Health bars for targets
 - Status bars for soldiers
 - Background music and UI sounds
+- Hitmarker damage markers, cash added animations
+- Flesh out purchasing robux soldiers.
+- Layout games progression mechanics. The curve of purchasing higher ranked soldiers and targets.
+- Credits purchases
 
 ### INCOMPLETE
 
-- Hitmarker damage markers, cash added animations
 
 - 12 Base-game soldiers fully fleshed out. Armor + Weapon models, Icons, Animations.
 - Tier 1: Grunt, Shotgunner, Heavy, Sniper, dual pistol, spray 'n pray. All light blue aesthetic but each has a unique weapon mechanic
 - Tier 2: Captain (Revolver), Backpack Bandit (AK), Baseball cap Raider (AR or shotgun, undecided). Deep red 'elite' 'bandit' aesthetics.
 - Tier 3: Vector (uses actual vector), One-shot (high tech sniper rifle), Akimbo (dual macs). A mix between techno - but art deco - stylings. Unique troopers
-
 - 2 Premium purchase soldiers. Armor + weapon models, icons, animations + standing on pedastal near store models.
-- Flesh out purchasing robux soldiers.
-- Flesh out gifting soldiers.
 
-- Layout games progression mechanics. The curve of purchasing higher ranked soldiers and targets.
-
-- Commander pass functionality + advertising. Extra soldier, more idle cash, etc.
-- Credits purchases
-
+- Commander pass functionality Extra soldier, more idle cash, etc.
+  
 - Polish map
-- Polish plot
-- Polish UI, music, etc
+- Polish plot / music / ambience
 
 - Create Icons, Thumbnails, Ads
 
@@ -49,5 +45,6 @@ Build an army is a simple, easy, aesthetically pleasing ROBLOX game. The player 
 - Boosts and the boost tree which allows free-players to earn boosts
 - Rebirths and rebirth shop for overpowered bonuses
 - Mercenaries, overpowered soldiers for rent
-- Soldier Merging
+- Soldier Merging / Evolving / Upgrading
 - Global Boost Events
+- Flesh out gifting soldiers.
