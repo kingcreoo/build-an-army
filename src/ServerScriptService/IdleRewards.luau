@@ -137,7 +137,15 @@ function IdleRewards.ClaimRewards(Player: Player)
 
     local PlayerData = Data.Get(Player)
 
-    PlayerData["leaderstats"]["Credits"] += Rewards[Player.Name]
+    -- Lump uncollected per-lane pending cash in with idle rewards for simplicity
+    local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
+    local UncollectedCash = RewardLoop.GetTotalPendingCash(Player.Name)
+
+    PlayerData["leaderstats"]["Credits"] += Rewards[Player.Name] + UncollectedCash
+
+    -- Clear all pending cash lanes since we've paid them out
+    PlayerData["PendingCash"] = {}
+
     Rewards[Player.Name] = nil
 
     Data.Set(Player, PlayerData)

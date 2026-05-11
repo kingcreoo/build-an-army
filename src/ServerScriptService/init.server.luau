@@ -609,6 +609,9 @@ local function UnlockSlot(Player: Player)
     PlayerData.Plot.Unlocks["Slot" .. NextSlot] = true
     Data.Set(Player, PlayerData)
 
+    -- Show the newly unlocked collect pad and wire its touch handler
+    PlayerPlotManagers[Player.Name]:OnLaneUnlocked(NextSlot)
+
     -- Refresh targets so the new lane gets a target
     local ActiveTarget = PlayerData.Inventory.ActiveTarget
     PlayerPlotManagers[Player.Name]:SetTarget(ActiveTarget)

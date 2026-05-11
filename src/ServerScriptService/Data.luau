@@ -106,7 +106,7 @@ end
 function Data.Remove(Player: Player)
     local PlayerData = DeepCopy(Database[Player.Name])
     PlayerData["LogOff"] = os.time()
-    PlayerData["PendingRewards"] = RewardLoop.GetPendingRewards(Player.Name)
+    PlayerData["PendingCash"] = RewardLoop.GetPendingCash(Player.Name)
     print("Removing " .. Player.Name .. ". Their data:")
     print(PlayerData)
     Database[Player.Name] = nil

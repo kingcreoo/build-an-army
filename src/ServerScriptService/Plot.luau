@@ -27,6 +27,18 @@ local SetSoldierBindable: BindableEvent = Remotes:WaitForChild("SetSoldierBindab
 local SetTargetBindable: BindableEvent = Remotes:WaitForChild("SetTargetBindable")
 local ClearSoldierBindable: BindableEvent = Remotes:WaitForChild("ClearSoldierBindable")
 
+local function EnsureRemoteEvent(Name: string): RemoteEvent
+    local Existing = Remotes:FindFirstChild(Name)
+    if Existing and Existing:IsA("RemoteEvent") then return Existing end
+    local Event = Instance.new("RemoteEvent")
+    Event.Name = Name
+    Event.Parent = Remotes
+    return Event
+end
+
+local UpdateCollectPadEvent: RemoteEvent = EnsureRemoteEvent("UpdateCollectPad")
+local CollectCashEvent: RemoteEvent = EnsureRemoteEvent("CollectCash")
+
 local TOTAL_LANES = 8
 
 -- // Local helpers
@@ -111,6 +123,7 @@ function PlotManager.new(Player: Player, PlayerData: table, PlotName: string)
 
     self:Populate(PlayerData)
     self:SetupCollectPads()
+    self:SyncCollectPadAmounts()
 
     RewardLoop.SetupRewards(self.Player)
 
@@ -135,7 +148,51 @@ function PlotManager:Populate(PlayerData: table)
     end
 end
 
+-- Shows or hides a single collect pad based on whether its lane is unlocked.
+-- Toggles GUIs, part transparency, and idle particle emitter.
+function PlotManager:SetCollectPadVisible(Lane: number, Visible: boolean)
+    local CashCollectors = self.Plot:FindFirstChild("CashCollectors")
+    if not CashCollectors then return end
+    local PadModel = CashCollectors:FindFirstChild("CollectCash" .. Lane)
+    if not PadModel then return end
+
+    -- Toggle BillboardGuis
+    local GuiParts = PadModel:FindFirstChild("GuiParts")
+    if GuiParts then
+        for _, Gui in ipairs(GuiParts:GetChildren()) do
+            if Gui:IsA("BillboardGui") then
+                Gui.Enabled = Visible
+            end
+        end
+    end
+
+    -- Toggle transparency on all BaseParts except GuiParts (the two visible pad parts)
+    -- and toggle idle particle emitter on the 0.5-stud part
+    for _, Child in ipairs(PadModel:GetChildren()) do
+        if Child:IsA("BasePart") and Child.Name ~= "GuiParts" then
+            Child.Transparency = Visible and 0 or 1
+            if Child.Size.X == 0.5 then
+                local Emitter = Child:FindFirstChildOfClass("ParticleEmitter")
+                if Emitter then Emitter.Enabled = Visible end
+            end
+        end
+    end
+end
+
+-- Fires UpdateCollectPad to the client for every unlocked lane so GUIs show correct amounts on join.
+function PlotManager:SyncCollectPadAmounts()
+    local PlayerData = Data.Get(self.Player)
+    local PendingCash = PlayerData["PendingCash"] or {}
+    for Lane = 1, TOTAL_LANES do
+        if IsSlotUnlocked(PlayerData, "Slot" .. Lane) then
+            local Amount = PendingCash[Lane] or 0
+            UpdateCollectPadEvent:FireClient(self.Player, Lane, Amount)
+        end
+    end
+end
+
 -- Wires the per-lane cash collect pads to the claim flow.
+-- Shows pads for unlocked lanes, hides locked ones.
 function PlotManager:SetupCollectPads()
     local CashCollectors = self.Plot:FindFirstChild("CashCollectors")
     if not CashCollectors then
@@ -143,45 +200,92 @@ function PlotManager:SetupCollectPads()
         return
     end
 
+    local PlayerData = Data.Get(self.Player)
+
     for Lane = 1, TOTAL_LANES do
         local PadModel = CashCollectors:FindFirstChild("CollectCash" .. Lane)
-        if PadModel then
-            -- The 0.5-stud invisible part is the step-on detector; fall back to any child Part otherwise.
-            local StepPart
-            for _, Child in ipairs(PadModel:GetChildren()) do
-                if Child:IsA("BasePart") and Child.Name ~= "GuiParts" and Child.Size.Y == 0.5 then
-                    StepPart = Child
-                    break
-                end
-            end
-            if not StepPart then
-                for _, Child in ipairs(PadModel:GetChildren()) do
-                    if Child:IsA("BasePart") and Child.Name ~= "GuiParts" then
-                        StepPart = Child
-                        break
-                    end
-                end
-            end
+        if not PadModel then continue end
 
-            if StepPart then
-                local Debounce = false
-                local Connection = StepPart.Touched:Connect(function(Hit)
-                    if Debounce then return end
+        local Unlocked = IsSlotUnlocked(PlayerData, "Slot" .. Lane)
+        self:SetCollectPadVisible(Lane, Unlocked)
 
-                    local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
-                    if not Humanoid then return end
+        if not Unlocked then continue end
 
-                    local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
-                    if HitPlayer ~= self.Player then return end
-
-                    Debounce = true
-                    RewardLoop.ClaimRewards(self.Player)
-                    task.wait(1)
-                    Debounce = false
-                end)
-                self.CollectConnections[Lane] = Connection
+        -- Find the 0.5-stud step-on detector part (Size.X == 0.5, Size=(0.5, 5.0, 5.0))
+        local StepPart
+        for _, Child in ipairs(PadModel:GetChildren()) do
+            if Child:IsA("BasePart") and Child.Name ~= "GuiParts" and Child.Size.X == 0.5 then
+                StepPart = Child
+                break
             end
         end
+
+        if StepPart then
+            local Debounce = false
+            local LaneNum = Lane -- capture for closure
+            local Connection = StepPart.Touched:Connect(function(Hit)
+                if Debounce then return end
+
+                local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
+                if not Humanoid then return end
+
+                local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
+                if HitPlayer ~= self.Player then return end
+
+                -- Only collect if there's actually cash waiting
+                if RewardLoop.GetPendingCash(self.Player.Name)[LaneNum] and RewardLoop.GetPendingCash(self.Player.Name)[LaneNum] > 0 then
+                    Debounce = true
+                    RewardLoop.ClaimRewards(self.Player, LaneNum)
+                    CollectCashEvent:FireClient(self.Player, LaneNum)
+                    task.wait(1)
+                    Debounce = false
+                end
+            end)
+            self.CollectConnections[Lane] = Connection
+        end
+    end
+end
+
+-- Called when a new lane is unlocked — shows that lane's collect pad and wires it.
+function PlotManager:OnLaneUnlocked(Lane: number)
+    self:SetCollectPadVisible(Lane, true)
+    local PlayerData = Data.Get(self.Player)
+    local Amount = (PlayerData["PendingCash"] and PlayerData["PendingCash"][Lane]) or 0
+    UpdateCollectPadEvent:FireClient(self.Player, Lane, Amount)
+
+    -- Wire the touch connection if not already wired
+    if self.CollectConnections[Lane] then return end
+
+    local CashCollectors = self.Plot:FindFirstChild("CashCollectors")
+    if not CashCollectors then return end
+    local PadModel = CashCollectors:FindFirstChild("CollectCash" .. Lane)
+    if not PadModel then return end
+
+    local StepPart
+    for _, Child in ipairs(PadModel:GetChildren()) do
+        if Child:IsA("BasePart") and Child.Name ~= "GuiParts" and Child.Size.X == 0.5 then
+            StepPart = Child
+            break
+        end
+    end
+
+    if StepPart then
+        local Debounce = false
+        local LaneNum = Lane
+        self.CollectConnections[Lane] = StepPart.Touched:Connect(function(Hit)
+            if Debounce then return end
+            local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
+            if not Humanoid then return end
+            local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
+            if HitPlayer ~= self.Player then return end
+            if RewardLoop.GetPendingCash(self.Player.Name)[LaneNum] and RewardLoop.GetPendingCash(self.Player.Name)[LaneNum] > 0 then
+                Debounce = true
+                RewardLoop.ClaimRewards(self.Player, LaneNum)
+                CollectCashEvent:FireClient(self.Player, LaneNum)
+                task.wait(1)
+                Debounce = false
+            end
+        end)
     end
 end
 

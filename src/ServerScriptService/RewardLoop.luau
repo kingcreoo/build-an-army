@@ -26,9 +26,11 @@ local Soldiers = {}
 local Targets = {}
 local TargetTypes = {}
 local Timers = {}
-local PendingRewards = {}
+local PendingCash = {}  -- [PlayerName][LaneNum] = number
 local DueDeaths = {}
 local PlayerPlotNames = {} -- Player.Name -> "Plot1".."Plot6"
+
+local UpdateCollectPadEvent -- resolved lazily to avoid circular require timing issues
 
 -- Returns the workspace plot folder for a given player, or nil if not assigned yet.
 local function GetPlotForPlayer(PlayerName: string)
@@ -47,8 +49,17 @@ local function OnPlayerRemoving(Player)
     DueDeaths[Player.Name] = nil
     PlayerPlotNames[Player.Name] = nil
     task.delay(5, function()
-        PendingRewards[Player.Name] = nil
+        PendingCash[Player.Name] = nil
     end)
+end
+
+-- Fires UpdateCollectPad to the player's client for a specific lane.
+local function NotifyCollectPad(Player: Player, LaneNum: number)
+    if not UpdateCollectPadEvent then
+        UpdateCollectPadEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("UpdateCollectPad")
+    end
+    local Amount = PendingCash[Player.Name] and PendingCash[Player.Name][LaneNum] or 0
+    UpdateCollectPadEvent:FireClient(Player, LaneNum, Amount)
 end
 
 local function CalculateTimeToHit(Plot: Instance, BulletSpeed: number)
@@ -76,11 +87,18 @@ local function AddReward(InfoTable: table)
     -- 1) Mark target as dead
     Targets[PlayerName][Slot].State = "Dead"
 
-    -- 2) Calculate and add reward
-    local TargetType = Targets[PlayerName][Slot].Type -- Need to store this
-    local RewardAmount = SETTINGS["TARGET_DATA"][TargetType]["Reward"] -- Add to SETTINGS
-    PendingRewards[PlayerName] = PendingRewards[PlayerName] + RewardAmount
-    -- Collect pad GUIs are updated client-side via CollectedCredits event; no server GUI ref needed.
+    -- 2) Calculate and add reward to this lane's pending cash bucket
+    local TargetType = Targets[PlayerName][Slot].Type
+    local RewardAmount = SETTINGS["TARGET_DATA"][TargetType]["Reward"]
+    local LaneNum = tonumber(string.sub(Slot, 5))
+    if LaneNum then
+        PendingCash[PlayerName][LaneNum] = (PendingCash[PlayerName][LaneNum] or 0) + RewardAmount
+        -- Notify client to update this lane's collect pad display
+        local Player = game:GetService("Players"):FindFirstChild(PlayerName)
+        if Player then
+            NotifyCollectPad(Player, LaneNum)
+        end
+    end
 
     -- 3) Schedule respawn
     local RespawnTime = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"]
@@ -204,8 +222,20 @@ end
 
 -- // Module Functions
 
-function RewardLoop.GetPendingRewards(PlayerName: string)
-    return PendingRewards[PlayerName]
+-- Returns the full per-lane pending cash dict for saving on logoff.
+function RewardLoop.GetPendingCash(PlayerName: string)
+    return PendingCash[PlayerName] or {}
+end
+
+-- Returns total pending cash across all lanes (used by IdleRewards lump sum).
+function RewardLoop.GetTotalPendingCash(PlayerName: string)
+    local Total = 0
+    if PendingCash[PlayerName] then
+        for _, Amount in pairs(PendingCash[PlayerName]) do
+            Total += Amount
+        end
+    end
+    return Total
 end
 
 function RewardLoop.ClearSoldier(PlayerName: string, Slot: string)
@@ -233,15 +263,7 @@ function RewardLoop.ClearSoldier(PlayerName: string, Slot: string)
         Timers[PlayerName][SoldierIDToRemove] = nil
     end
 
-    -- 2) Reindex remaining soldiers by moving higher slots down
-    local RemovedSlotNumber = tonumber(string.sub(Slot, 5))
-    for _, SoldierData in pairs(Soldiers[PlayerName]) do
-        local CurrentSlotNumber = tonumber(string.sub(SoldierData.Slot, 5))
-        if CurrentSlotNumber > RemovedSlotNumber then
-            -- Move soldier down one slot
-            SoldierData.Slot = "Slot" .. tostring(CurrentSlotNumber - 1)
-        end
-    end
+    -- No reindexing: slots are positional dict keys, gaps are valid.
 end
 
 function RewardLoop.SetSoldier(PlayerName: string, Slot: string, SoldierID: string, SoldierData: table)
@@ -250,7 +272,7 @@ function RewardLoop.SetSoldier(PlayerName: string, Slot: string, SoldierID: stri
         Soldiers[PlayerName] = {}
         Targets[PlayerName] = {}
         TargetTypes[PlayerName] = ""
-        PendingRewards[PlayerName] = 0
+        PendingCash[PlayerName] = {}
         DueDeaths[PlayerName] = {}
     end
 
@@ -289,10 +311,12 @@ function RewardLoop.SetupPlayer(Player, PlayerData)
     TargetTypes[Player.Name] = ""
     Timers[Player.Name] = {}
     DueDeaths[Player.Name] = {}
-    if PlayerData["PendingRewards"] then
-        PendingRewards[Player.Name] = PlayerData["PendingRewards"]
-    else
-        PendingRewards[Player.Name] = 0
+    -- Restore per-lane pending cash from saved data (or start fresh)
+    PendingCash[Player.Name] = {}
+    if PlayerData["PendingCash"] then
+        for Lane, Amount in pairs(PlayerData["PendingCash"]) do
+            PendingCash[Player.Name][tonumber(Lane)] = Amount
+        end
     end
 end
 
@@ -364,24 +388,24 @@ function RewardLoop.Init()
     end)
 end
 
-function RewardLoop.ClaimRewards(Player)
-    -- 1) Get amount
-    local Amount = PendingRewards[Player.Name] or 0
+-- Claims pending cash for a specific lane. Called when player steps on that lane's collect pad.
+function RewardLoop.ClaimRewards(Player: Player, LaneNum: number)
+    if not PendingCash[Player.Name] then return end
+    local Amount = PendingCash[Player.Name][LaneNum] or 0
     if Amount <= 0 then return end
 
-    -- 2) Get & Set player data
     local Data = require(script.Parent.Data)
     local PlayerData = Data.Get(Player)
 
     PlayerData["leaderstats"]["Credits"] += Amount
-    PlayerData["PendingRewards"] = 0
-    PendingRewards[Player.Name] = 0
+    PendingCash[Player.Name][LaneNum] = 0
+    if not PlayerData["PendingCash"] then PlayerData["PendingCash"] = {} end
+    PlayerData["PendingCash"][LaneNum] = 0
 
     Data.Set(Player, PlayerData)
 
-    -- 3) Notify client so collect pad GUI resets (client handles visuals)
-    local CollectedCreditsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CollectedCredits")
-    CollectedCreditsEvent:FireClient(Player, Amount)
+    -- Tell client this lane's pad is now empty
+    NotifyCollectPad(Player, LaneNum)
 end
 
 function RewardLoop.SyncTables()

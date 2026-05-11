@@ -38,7 +38,9 @@ SETTINGS.DEFAULT_DATA = {
     },
     ["Offers"] = {
         ["StarterPackPurchased"] = false
-    }
+    },
+    -- Per-lane pending cash keyed by lane number (1-8). Persists between sessions.
+    ["PendingCash"] = {}
 }
 
 -- Shared placeholder art references; real assets get swapped per-soldier later
