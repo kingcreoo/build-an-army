@@ -192,13 +192,19 @@ local function ActivateSoldier(SoldierID)
     -- 1) Check if there is ample room to activate soldier
     local UnlockedLanes = {}
     local PlotUnlocks = LatestData.Plot.Unlocks
-    for i = 1, 7 do
+    for i = 1, 8 do
         if PlotUnlocks["Slot" .. tostring(i)] then
             table.insert(UnlockedLanes, "Slot" .. tostring(i))
         end
     end
 
-    if #LatestData["Inventory"]["ActiveSoldiers"] >= #UnlockedLanes then
+    -- ActiveSoldiers is a dict keyed by lane number; count entries manually.
+    local ActiveCount = 0
+    for _ in pairs(LatestData["Inventory"]["ActiveSoldiers"]) do
+        ActiveCount += 1
+    end
+
+    if ActiveCount >= #UnlockedLanes then
         -- If not, warn player
         -- TODO prompt player to purchase gamepass for more lanes
         NotifyBindable:Fire("Maximum soldiers!", .8, Color3.fromRGB(255, 0, 0))

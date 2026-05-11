@@ -39,11 +39,11 @@ local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
 
 local TargetModels = ReplicatedStorage:WaitForChild("Types"):WaitForChild("Targets")
 
-local UpgradeShop = Workspace:WaitForChild("UpgradeShop")
-local UpgradeShopBase: Part = UpgradeShop:WaitForChild("Base")
-local GuiParts = UpgradeShop:WaitForChild("GuiParts")
-local ShopAmountGui = GuiParts:WaitForChild("AmountGui")
-local ShopAmountLabel: TextLabel = ShopAmountGui:WaitForChild("Amount")
+-- TODO: Old workspace UpgradeShop model removed in new map. Target upgrade display
+-- will be wired to UpgradeTargetRing + pedestal in the plot. Stubbed for now.
+local UpgradeShop = nil
+local UpgradeShopBase = nil
+local ShopAmountLabel = nil
 
 local Buttons = {YesButton, NoButton}
 
@@ -60,9 +60,10 @@ local function DisplayTarget(TargetType: string)
 	NextTargetType = TargetType
 
 	-- 1) Find & delete possible past display target
-	local ExistingDisplay = UpgradeShop:FindFirstChild("DisplayTarget")
-	if ExistingDisplay then
-		ExistingDisplay:Destroy()
+	-- TODO: clear from TargetUnlockPedastal once rings are wired
+	if UpgradeShop then
+		local ExistingDisplay = UpgradeShop:FindFirstChild("DisplayTarget")
+		if ExistingDisplay then ExistingDisplay:Destroy() end
 	end
 
 	-- 2) Clone & display new target at UpgradeShop
@@ -75,12 +76,13 @@ local function DisplayTarget(TargetType: string)
 	local DisplayModel = TargetModel:Clone()
 	DisplayModel.Name = "DisplayTarget"
 
-	DisplayModel:SetPrimaryPartCFrame(UpgradeShopBase.CFrame * CFrame.Angles(0, math.rad(180), 0) + Vector3.new(0, 3, 0))
-	DisplayModel.Parent = UpgradeShop
+	-- TODO: Position display model on TargetUnlockPedastal in the plot once rings are wired.
+	-- DisplayModel:PivotTo(UpgradeShopBase.CFrame * CFrame.Angles(0, math.rad(180), 0) + Vector3.new(0, 3, 0))
+	-- DisplayModel.Parent = UpgradeShop
 
 	-- 3) Update the price display on the shop GUI
 	local Price = SETTINGS.TARGET_DATA[TargetType].Price
-	ShopAmountLabel.Text = "$" .. Price
+	if ShopAmountLabel then ShopAmountLabel.Text = "$" .. Price end
 
 	-- 4) Update the frame GUI elements
 	AmountLabel.Text = "$" .. Price
@@ -93,16 +95,13 @@ local function DisplayComplete()
 	NextTargetType = nil
 
 	-- 1) Find & delete possible past display target
-	local ExistingDisplay = UpgradeShop:FindFirstChild("DisplayTarget")
-	if ExistingDisplay then
-		ExistingDisplay:Destroy()
-	end
+	-- TODO: Clear from TargetUnlockPedastal once rings are wired.
 
 	-- 2) Clone & display complete sign
 	-- TODO: Add complete sign model
 
 	-- 3) Update the price display to say "COMPLETE"
-	ShopAmountLabel.Text = "COMPLETE"
+	if ShopAmountLabel then ShopAmountLabel.Text = "COMPLETE" end
 	AmountLabel.Text = "COMPLETE"
 end
 

@@ -17,8 +17,10 @@ local IdleRewards = require(ServerScriptService:WaitForChild("Server"):WaitForCh
 local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
 
 -- // Variables
-local Anchors = Workspace:WaitForChild("Anchors")
-local OccupiedAnchors = {}
+local Plots = Workspace:WaitForChild("Plots")
+local PLOT_NAMES = {"Plot1", "Plot2", "Plot3", "Plot4", "Plot5", "Plot6"}
+local PlotAssignments = {} -- PlotName -> Player
+local PlayerPlots = {}     -- Player.Name -> PlotName
 local PlayerPlotManagers = {}
 local CurrentStock
 local TimeOfStock
@@ -57,6 +59,8 @@ local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 local SellSoldierEvent: RemoteEvent = Remotes:WaitForChild("SellSoldier")
 local UnlockSlotEvent: RemoteEvent = Remotes:WaitForChild("UnlockSlot")
 local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
+local PlotAssignmentEvent: RemoteEvent = EnsureRemoteEvent("PlotAssignment")
+local OpenUIEvent: RemoteEvent = EnsureRemoteEvent("OpenUI")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -142,139 +146,24 @@ local function CanShowCommanderPass(Player: Player): boolean
     return not TransactionManager.IsPassOwned(Player, "CommanderPass")
 end
 
--- Manages the starter pack timer and touch-open flow for a player's plot
+-- STUB: Starter pack used to live as a touchable part on the old plot template.
+-- New map uses StarterPackRing in InteractionRings; this whole flow needs a rewrite.
+-- Disabled for today's redux pass so the server doesn't error referencing nonexistent parts.
 local function SetupStarterPack(Player: Player)
-    local PlotManager = PlayerPlotManagers[Player.Name]
-    if not PlotManager or not PlotManager.Plot then
-        return
-    end
-
-    local StarterPackPart = PlotManager.Plot:FindFirstChild("StarterPack")
-    if not StarterPackPart then
-        return
-    end
-
-    local TimerGui = StarterPackPart:FindFirstChild("TimerGui")
-    local TimerText = TimerGui and TimerGui:FindFirstChild("Time")
-
-    StarterPackPart.Touched:Connect(function(Hit)
-        local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
-        if not Humanoid then return end
-
-        local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
-        if HitPlayer ~= Player then return end
-
-        local PlayerData = Data.Get(Player)
-        if not CanShowStarterPack(Player, PlayerData) then
-            if StarterPackOpenStates[Player.Name] then
-                StarterPackEvent:FireClient(Player, "Close")
-                StarterPackOpenStates[Player.Name] = false
-            end
-            RemoveStarterPackPart(Player)
-            return
-        end
-
-        if StarterPackOpenStates[Player.Name] then return end
-
-        local CooldownUntil = StarterPackTouchCooldowns[Player.Name] or 0
-        if os.clock() < CooldownUntil then return end
-
-        StarterPackOpenStates[Player.Name] = true
-        StarterPackEvent:FireClient(Player, "Open")
-    end)
-
-    task.spawn(function()
-        while Player.Parent do
-            local PlayerData = Data.Get(Player)
-            if not PlayerData then break end
-
-            if not CanShowStarterPack(Player, PlayerData) then
-                if StarterPackOpenStates[Player.Name] then
-                    StarterPackEvent:FireClient(Player, "Close")
-                    StarterPackOpenStates[Player.Name] = false
-                end
-                RemoveStarterPackPart(Player)
-                break
-            end
-
-            local CurrentPlotManager = PlayerPlotManagers[Player.Name]
-            local CurrentPart = CurrentPlotManager and CurrentPlotManager.Plot and CurrentPlotManager.Plot:FindFirstChild("StarterPack")
-            if not CurrentPart then
-                break
-            end
-
-            if TimerText and (TimerText:IsA("TextLabel") or TimerText:IsA("TextBox")) then
-                local RemainingSeconds = math.max(0, SETTINGS.STARTER_PACK.OfferSeconds - GetCurrentPlayTime(Player, PlayerData))
-                TimerText.Text = FormatStarterPackTime(RemainingSeconds)
-            end
-
-            task.wait(1)
-        end
-    end)
+    -- TODO: Rewire to StarterPackRing ProximityPrompt + ring on/off toggling
+    return
 end
 
+
+
+-- STUB: Same situation as SetupStarterPack — old "CommanderPass" part is gone.
+-- New map uses CommanderPassRing; this needs a rewrite that's out of scope for today.
 local function SetupCommanderPass(Player: Player)
-    local PlotManager = PlayerPlotManagers[Player.Name]
-    if not PlotManager or not PlotManager.Plot then
-        return
-    end
-
-    local CommanderPassPart = PlotManager.Plot:FindFirstChild("CommanderPass")
-    if not CommanderPassPart then
-        return
-    end
-
-    if not CanShowCommanderPass(Player) then
-        RemoveCommanderPassPart(Player)
-        return
-    end
-
-    CommanderPassPart.Touched:Connect(function(Hit)
-        local Humanoid = Hit.Parent and Hit.Parent:FindFirstChild("Humanoid")
-        if not Humanoid then return end
-
-        local HitPlayer = Players:GetPlayerFromCharacter(Hit.Parent)
-        if HitPlayer ~= Player then return end
-
-        if not CanShowCommanderPass(Player) then
-            if CommanderPassOpenStates[Player.Name] then
-                CommanderPassEvent:FireClient(Player, "Close")
-                CommanderPassOpenStates[Player.Name] = false
-            end
-            RemoveCommanderPassPart(Player)
-            return
-        end
-
-        if CommanderPassOpenStates[Player.Name] then return end
-
-        local CooldownUntil = CommanderPassTouchCooldowns[Player.Name] or 0
-        if os.clock() < CooldownUntil then return end
-
-        CommanderPassOpenStates[Player.Name] = true
-        CommanderPassEvent:FireClient(Player, "Open")
-    end)
-
-    task.spawn(function()
-        while Player.Parent do
-            if not CanShowCommanderPass(Player) then
-                if CommanderPassOpenStates[Player.Name] then
-                    CommanderPassEvent:FireClient(Player, "Close")
-                    CommanderPassOpenStates[Player.Name] = false
-                end
-                RemoveCommanderPassPart(Player)
-                break
-            end
-
-            local CurrentPlotManager = PlayerPlotManagers[Player.Name]
-            local CurrentPart = CurrentPlotManager and CurrentPlotManager.Plot and CurrentPlotManager.Plot:FindFirstChild("CommanderPass")
-            if not CurrentPart then
-                break
-            end
-
-            task.wait(1)
-        end
-    end)
+    -- TODO: Rewire to CommanderPassRing ProximityPrompt + ownership check
+    return
 end
+
+
 
 local function AutoEquip(Player: Player)
     -- 1) Get fresh player data
@@ -285,14 +174,13 @@ local function AutoEquip(Player: Player)
         return false
     end
 
-    -- 3) Get number of unlocked slots
-    local UnlockedSlots = {}
-    for i = 1, 7 do
-        if PlayerData.Plot.Unlocks["Slot" .. tostring(i)] then
-            table.insert(UnlockedSlots, i)
+    -- 3) Collect unlocked lane numbers (1-8). Lane 7 = rebirth, lane 8 = commander.
+    local UnlockedLanes = {}
+    for Lane = 1, 8 do
+        if PlayerData.Plot.Unlocks["Slot" .. Lane] then
+            table.insert(UnlockedLanes, Lane)
         end
     end
-    local MaxSlots = #UnlockedSlots
 
     -- 4) Get all owned soldiers
     local OwnedSoldiers = {}
@@ -303,25 +191,26 @@ local function AutoEquip(Player: Player)
         })
     end
 
-    -- 5) Sort soldiers by rating
+    -- 5) Sort soldiers by rating (best first)
     table.sort(OwnedSoldiers, function(a, b)
         local aIndex = table.find(SETTINGS.RATING_ORDER, a.Type)
         local bIndex = table.find(SETTINGS.RATING_ORDER, b.Type)
-
         return aIndex < bIndex
     end)
 
-    -- 6) Deactive all current soldiers in reverse order
+    -- 6) Deactivate every currently active soldier (dict iteration; no reindexing).
     local PlotManager = PlayerPlotManagers[Player.Name]
     local CurrentlyActive = PlayerData["Inventory"]["ActiveSoldiers"]
-
-    for i = #CurrentlyActive, 1, -1 do
-        local SoldierID = CurrentlyActive[i]
+    local IDsToDeactivate = {}
+    for _, SoldierID in pairs(CurrentlyActive) do
+        table.insert(IDsToDeactivate, SoldierID)
+    end
+    for _, SoldierID in ipairs(IDsToDeactivate) do
         PlotManager:Deactivate(SoldierID)
     end
 
-    -- 7) Active new best soldiers in rating order
-    local SlotsToFill = math.min(MaxSlots, #OwnedSoldiers)
+    -- 7) Place best soldiers into unlocked lanes in order. Gaps remain gaps.
+    local SlotsToFill = math.min(#UnlockedLanes, #OwnedSoldiers)
     for i = 1, SlotsToFill do
         PlotManager:Activate(OwnedSoldiers[i].ID)
     end
@@ -457,15 +346,62 @@ local function InitializeLeaderstats(Player: Player, PlayerData: table)
     end
 end
 
-local function AssignPlotAnchor()
-    local AssignedAnchor
-    for _, Anchor in ipairs(Anchors:GetChildren()) do
-        if not table.find(OccupiedAnchors, Anchor) then
-            AssignedAnchor = Anchor
-            table.insert(OccupiedAnchors, AssignedAnchor)
-
-            return AssignedAnchor
+-- Returns the first unoccupied plot name (Plot1-Plot6) or nil if the server is full.
+local function AssignPlot(Player: Player): string?
+    for _, PlotName in ipairs(PLOT_NAMES) do
+        if not PlotAssignments[PlotName] then
+            PlotAssignments[PlotName] = Player
+            PlayerPlots[Player.Name] = PlotName
+            return PlotName
         end
+    end
+    return nil
+end
+
+-- Broadcasts every active plot assignment to one client (used on player join).
+local function BroadcastAssignmentsTo(Player: Player)
+    for PlotName, OwnerPlayer in pairs(PlotAssignments) do
+        if OwnerPlayer and OwnerPlayer.Parent then
+            PlotAssignmentEvent:FireClient(Player, OwnerPlayer.Name, PlotName)
+        end
+    end
+end
+
+-- Maps ring model names to UI identifiers sent to the client.
+local RING_TO_UI = {
+    ["SoldierShopRing"]        = "SoldierShop",
+    ["UpgradeTargetRing"]      = "UpgradeTarget",
+    ["TrashCanRing"]           = "SellSoldiers",
+    ["UnlockLaneRing"]         = "UnlockSlot",
+    ["BoostRing"]              = "Boost",
+    ["RebirthRing"]            = "Rebirth",
+    ["CommanderPassRing"]      = "CommanderPass",
+    ["StarterPackRing"]        = "StarterPack",
+    ["UnlockRebirthLaneRing"]  = "UnlockRebirthLane",
+    ["UnlockCommanderLaneRing"] = "UnlockCommanderLane",
+}
+
+-- Wires every InteractionRing ProximityPrompt in the player's plot to fire OpenUI to that player.
+-- Only the plot owner can trigger their own rings.
+local function SetupRings(Player: Player, PlotFolder: Instance)
+    local Rings = PlotFolder:FindFirstChild("InteractionRings")
+    if not Rings then
+        warn("[Server] No InteractionRings on " .. PlotFolder.Name)
+        return
+    end
+
+    for _, Ring in ipairs(Rings:GetChildren()) do
+        local UIName = RING_TO_UI[Ring.Name]
+        if not UIName then continue end
+
+        local GuiParts = Ring:FindFirstChild("GuiParts")
+        local Prompt = GuiParts and GuiParts:FindFirstChildOfClass("ProximityPrompt")
+        if not Prompt then continue end
+
+        Prompt.Triggered:Connect(function(Triggerer: Player)
+            if Triggerer ~= Player then return end
+            OpenUIEvent:FireClient(Player, UIName)
+        end)
     end
 end
 
@@ -490,16 +426,38 @@ local function OnPlayerAdded(Player: Player)
         IdleRewards.OnPlayerAdded(Player, PlayerData)
     end
 
-    -- 2) Create player's plot
-    local PlayerPlot = Plot.new(Player, PlayerData, AssignPlotAnchor())
+    -- 2) Assign a plot folder (kick if all 6 occupied)
+    local PlotName = AssignPlot(Player)
+    if not PlotName then
+        Player:Kick("Server full.")
+        return
+    end
+
+    -- 2a) Tell every client about this player's plot assignment BEFORE populating.
+    -- The yield gives clients a frame to process the assignment before SetSoldier/SetTarget arrive.
+    PlotAssignmentEvent:FireAllClients(Player.Name, PlotName)
+    BroadcastAssignmentsTo(Player)
+    task.wait() -- one frame yield
+
+    -- 2b) Create the plot manager (fires SetSoldier/SetTarget to clients during Populate)
+    RewardLoop.SetPlotName(Player.Name, PlotName)
+    local PlayerPlot = Plot.new(Player, PlayerData, PlotName)
     PlayerPlotManagers[Player.Name] = PlayerPlot
+
+    -- 2c) Wire interaction rings to open UIs for this player
+    SetupRings(Player, PlayerPlot.Plot)
 
     -- 3) Initialize player's leaderstats
     InitializeLeaderstats(Player, PlayerData)
 
-    -- 4) Teleport player's character to their plot
+    -- 4) Teleport player's character to their plot (ShopAreaBase + 10 studs Y)
     local Character = Player.Character or Player.CharacterAdded:Wait()
-    Character:SetPrimaryPartCFrame(PlayerPlot.Plot.Spawn.CFrame + Vector3.new(0, 3, 0))
+    local ShopBase = PlayerPlot.Plot:FindFirstChild("ShopAreaBase")
+    if ShopBase then
+        Character:PivotTo(CFrame.new(ShopBase.Position + Vector3.new(0, 15, 0)))
+    else
+        warn("[Server] ShopAreaBase not found on " .. PlotName)
+    end
 
     -- 5) Run AutoEquip in case inventory changed while offline
     AutoEquip(Player)
@@ -535,10 +493,18 @@ local function OnPlayerRemoving(Player: Player)
     -- 1) Remove player's data (save & write logoff details too)
     Data.Remove(Player)
 
-    -- 2) Cleanup player's plot (& set vacant)
+    -- 2) Cleanup player's plot and free the assignment
     local PlayerPlot = PlayerPlotManagers[Player.Name]
-    table.remove(OccupiedAnchors, table.find(OccupiedAnchors, PlayerPlot.Anchor))
-    PlayerPlot:Cleanup()
+    if PlayerPlot then
+        PlayerPlot:Cleanup()
+    end
+
+    local PlotName = PlayerPlots[Player.Name]
+    if PlotName then
+        PlotAssignments[PlotName] = nil
+    end
+    PlayerPlots[Player.Name] = nil
+
     PlayerPlotManagers[Player.Name] = nil
     SessionStartTimes[Player.Name] = nil
     StarterPackOpenStates[Player.Name] = nil
@@ -611,12 +577,12 @@ local function SellSoldier(Player: Player, SoldierID: string)
     return "Sold", PlayerData
 end
 
--- Processes a slot unlock request from a player
+-- Unlocks the next credit-priced lane (4-6 only).
+-- Lane 7 = rebirth token (handled by RebirthRing). Lane 8 = commander pass (handled by CommanderRing).
 local function UnlockSlot(Player: Player)
-    -- 1) Get player data
     local PlayerData = Data.Get(Player)
 
-    -- 2) Find next slot to unlock (4, 5, or 6)
+    -- Find the next 4-6 lane that's locked
     local NextSlot = nil
     for i = 4, 6 do
         if not PlayerData.Plot.Unlocks["Slot" .. i] then
@@ -625,39 +591,29 @@ local function UnlockSlot(Player: Player)
         end
     end
 
-    -- 3) If no next slot (all unlocked), return MaxSlots
     if not NextSlot then
         return "MaxSlots", nil
     end
 
-    -- 4) Get price from SETTINGS
     local Price = SETTINGS.SLOT_PRICES[NextSlot]
-
-    -- 5) If price is "VIP", return VIPRequired
-    if Price == "VIP" then
-        -- TODO: Integrate with gamepass check for slot 7
-        return "VIPRequired", nil
+    if type(Price) ~= "number" then
+        -- Should never hit; lanes 4-6 are pure credit cost.
+        return "Invalid", nil
     end
 
-    -- 6) Check player has sufficient funds
     if PlayerData["leaderstats"]["Credits"] < Price then
         return "Insufficient", nil
     end
 
-    -- 7) Deduct credits
     PlayerData["leaderstats"]["Credits"] -= Price
-
-    -- 8) Unlock the slot
     PlayerData.Plot.Unlocks["Slot" .. NextSlot] = true
-
-    -- 9) Save data
     Data.Set(Player, PlayerData)
 
-    -- 10) Refresh targets to spawn target in newly unlocked slot
+    -- Refresh targets so the new lane gets a target
     local ActiveTarget = PlayerData.Inventory.ActiveTarget
     PlayerPlotManagers[Player.Name]:SetTarget(ActiveTarget)
 
-    -- 11) AutoEquip into the new lane if enabled
+    -- AutoEquip into the new lane if enabled
     AutoEquip(Player)
 
     return "Unlocked", Data.Get(Player)

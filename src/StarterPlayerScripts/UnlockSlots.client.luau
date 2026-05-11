@@ -36,7 +36,8 @@ local NoButton: TextButton = MainFrame:WaitForChild("No")
 local AmountLabel: TextLabel = MainFrame:WaitForChild("Amount")
 local TextLabel: TextLabel = MainFrame:WaitForChild("Text")
 
-local UnlockSlotsModel = Workspace:WaitForChild("UnlockSlots")
+-- TODO: Old workspace UnlockSlots model removed in new map. Ring-based unlock UI replaces this.
+local UnlockSlotsModel = Workspace:FindFirstChild("UnlockSlots")
 
 local Buttons = {YesButton, NoButton}
 
@@ -94,13 +95,7 @@ local function CleanupForMaxedPlayer()
 		CloseFrameBindable:Fire(UnlockSlotFrame)
 	end
 	
-	-- Move the workspace model down instead of destroying
-	if UnlockSlotsModel then
-		UnlockSlotsModel:SetPrimaryPartCFrame(UnlockSlotsModel:GetPrimaryPartCFrame() * CFrame.new(0, -100, 0))
-	end
-	
-	-- TODO: Check if player has VIP gamepass
-	-- If not VIP, show separate VIP advertisement model for slot 7
+	-- TODO: Ring-based unlock UI cleanup goes here when rings are wired.
 end
 
 -- Processes player data (called from cached data or future events)
@@ -212,8 +207,8 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 		NotifyBindable:Fire("All slots unlocked!", 0.8, Color3.fromRGB(255, 255, 0))
 		CleanupForMaxedPlayer()
 	elseif Response == "VIPRequired" then
-		NotifyBindable:Fire("VIP required for slot 7!", 0.8, Color3.fromRGB(255, 255, 0))
-		-- TODO: Prompt VIP gamepass purchase
+		-- Should not occur for lanes 4-6; lanes 7-8 handled by their own rings.
+		NotifyBindable:Fire("Use the rebirth or commander ring!", 0.8, Color3.fromRGB(255, 255, 0))
 	else
 		NotifyBindable:Fire("Error unlocking slot!", 0.8, Color3.fromRGB(255, 0, 0))
 	end

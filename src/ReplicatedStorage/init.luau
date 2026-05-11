@@ -15,7 +15,8 @@ SETTINGS.DEFAULT_DATA = {
             ["Slot4"] = false,
             ["Slot5"] = false,
             ["Slot6"] = false,
-            ["Slot7"] = false
+            ["Slot7"] = false,
+            ["Slot8"] = false
         }
     },
     ["Inventory"] = {
@@ -564,11 +565,14 @@ SETTINGS.TARGET_ORDER = {
     "Target1", "Target2", "Target3", "Target4", "Target5", "Target6", "Target7"
 }
 
+-- Lane unlock prices. Numeric = credit cost. Strings = special unlock source.
+-- "Rebirth" = unlocked via rebirth token (lane 7). "Commander" = unlocked via Commander Pass (lane 8).
 SETTINGS.SLOT_PRICES = {
     [4] = 2500,
     [5] = 10000,
     [6] = 100000,
-    [7] = "Commander" -- Slot 7 unlocked by Commander Pass
+    [7] = "Rebirth",
+    [8] = "Commander"
 }
 
 SETTINGS.DISTANCES = {

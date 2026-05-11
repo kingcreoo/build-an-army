@@ -38,6 +38,20 @@
         "write": false, "edit": false, "patch": false, "multiedit": false,
         "bash": false, "read": true, "grep": true, "glob": true
       }
+    },
+    "build": {
+      "description": "Edit-capable builder agent — full write/edit/bash access.",
+      "mode": "primary",
+      "model": "opencode/claude-opus-4-7",
+      "temperature": 0.2,
+      "reasoningEffort": "high",
+      "permission": { "edit": "allow", "bash": "ask", "webfetch": "ask" },
+      "tools": {
+        "write": true, "edit": true, "patch": true, "multiedit": true,
+        "bash": true, "todowrite": true, "todoread": true,
+        "read": true, "grep": true, "glob": true, "list": true,
+        "webfetch": true, "websearch": true
+      }
     }
   }
 }

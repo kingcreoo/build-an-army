@@ -28,6 +28,14 @@ local TargetTypes = {}
 local Timers = {}
 local PendingRewards = {}
 local DueDeaths = {}
+local PlayerPlotNames = {} -- Player.Name -> "Plot1".."Plot6"
+
+-- Returns the workspace plot folder for a given player, or nil if not assigned yet.
+local function GetPlotForPlayer(PlayerName: string)
+    local PlotName = PlayerPlotNames[PlayerName]
+    if not PlotName then return nil end
+    return Workspace:WaitForChild("Plots"):FindFirstChild(PlotName)
+end
 
 -- // Local Functions
 
@@ -37,17 +45,23 @@ local function OnPlayerRemoving(Player)
     TargetTypes[Player.Name] = nil
     Timers[Player.Name] = nil
     DueDeaths[Player.Name] = nil
+    PlayerPlotNames[Player.Name] = nil
     task.delay(5, function()
         PendingRewards[Player.Name] = nil
     end)
 end
 
-local function CalculateTimeToHit(Plot: Model, BulletSpeed: number)
-    -- TODO calculate boosts, and also set distances for each world
-    local Distance = (Plot.Info.Target1.Position - Plot.Info.Slot1.Position).Magnitude
-    local Duration = Distance / BulletSpeed
+local function CalculateTimeToHit(Plot: Instance, BulletSpeed: number)
+    -- New map: distance derived from SoldierSpawn1 -> TargetSpawn1 in plot.Spawns.
+    -- TODO: per-lane variance if lane lengths ever differ.
+    local Spawns = Plot:FindFirstChild("Spawns")
+    if not Spawns then return 0 end
+    local SoldierSpawn = Spawns:FindFirstChild("SoldierSpawn1")
+    local TargetSpawn = Spawns:FindFirstChild("TargetSpawn1")
+    if not SoldierSpawn or not TargetSpawn then return 0 end
 
-    return Duration
+    local Distance = (TargetSpawn.Position - SoldierSpawn.Position).Magnitude
+    return Distance / BulletSpeed
 end
 
 local function AddReward(InfoTable: table)
@@ -66,8 +80,7 @@ local function AddReward(InfoTable: table)
     local TargetType = Targets[PlayerName][Slot].Type -- Need to store this
     local RewardAmount = SETTINGS["TARGET_DATA"][TargetType]["Reward"] -- Add to SETTINGS
     PendingRewards[PlayerName] = PendingRewards[PlayerName] + RewardAmount
-    local Collect = Workspace.Plots[PlayerName].Collect
-    Collect.GUI.Amount.Text = "$" .. PendingRewards[PlayerName]
+    -- Collect pad GUIs are updated client-side via CollectedCredits event; no server GUI ref needed.
 
     -- 3) Schedule respawn
     local RespawnTime = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"]
@@ -89,7 +102,7 @@ local function ApplyBulletDamage(InfoTable: table, WeaponInfo: table)
 	if CurrentHealth - Damage <= 0 and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].State == "Alive" then
 		DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = true
 		local BulletSpeed = WeaponInfo["BulletSpeed"]
-		local TimeToHit = CalculateTimeToHit(Workspace.Plots:FindFirstChild(InfoTable.PlayerName), BulletSpeed)
+		local TimeToHit = CalculateTimeToHit(GetPlotForPlayer(InfoTable.PlayerName), BulletSpeed)
 		task.delay(TimeToHit, function()
 			AddReward(InfoTable)
 			task.delay(SETTINGS["TARGET_DATA"][TargetTypes[InfoTable.PlayerName]]["TotalRespawnTime"], function()
@@ -283,9 +296,14 @@ function RewardLoop.SetupPlayer(Player, PlayerData)
     end
 end
 
+-- Stores the player's plot name so RewardLoop can resolve the workspace folder.
+-- Called from init.server after plot assignment, before SetupRewards.
+function RewardLoop.SetPlotName(PlayerName: string, PlotName: string)
+    PlayerPlotNames[PlayerName] = PlotName
+end
+
 function RewardLoop.SetupRewards(Player)
-    local Collect = Workspace.Plots[Player.Name].Collect
-    Collect.GUI.Amount.Text = "$" .. PendingRewards[Player.Name]
+    -- Collect pad GUIs are driven client-side; nothing to set up server-side here.
 end
 
 function RewardLoop.Init()
@@ -361,11 +379,9 @@ function RewardLoop.ClaimRewards(Player)
 
     Data.Set(Player, PlayerData)
 
-    -- 3) Update GUI
-    local Collect = Workspace.Plots[Player.Name].Collect
-    Collect.GUI.Amount.Text = "$0"
-
-    -- 4) TODO client event for effects
+    -- 3) Notify client so collect pad GUI resets (client handles visuals)
+    local CollectedCreditsEvent = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("CollectedCredits")
+    CollectedCreditsEvent:FireClient(Player, Amount)
 end
 
 function RewardLoop.SyncTables()

@@ -101,8 +101,8 @@ function IdleRewards.OnPlayerAdded(Player: Player, PlayerData: table)
     -- 1a)
     if not PlayerData["LogOff"] then return end
 
-    -- 1b)
-    if #PlayerData["Inventory"]["ActiveSoldiers"] <= 0 then return end
+    -- 1b) ActiveSoldiers is a dict keyed by lane number; use next() to check emptiness.
+    if not next(PlayerData["Inventory"]["ActiveSoldiers"]) then return end
 
     -- 1c)
     if PlayerData["Inventory"]["ActiveTarget"] == nil then return end

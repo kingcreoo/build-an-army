@@ -82,11 +82,14 @@ local OpenStoreBindable: BindableEvent = Remotes:WaitForChild("OpenStoreBindable
 local HUDBindable: BindableEvent = Remotes:WaitForChild("HUDBindable")
 local StarterPackEvent: RemoteEvent = Remotes:WaitForChild("StarterPackEvent")
 local CommanderPassEvent: RemoteEvent = Remotes:WaitForChild("CommanderPassEvent")
+local OpenUIEvent: RemoteEvent = Remotes:WaitForChild("OpenUI")
 
-local SoldierShopPrompt: ProximityPrompt = Workspace:WaitForChild("SoldierShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
-local UpgradeShopPrompt: ProximityPrompt = Workspace:WaitForChild("UpgradeShop"):WaitForChild("PromptPart"):WaitForChild("Prompt")
-local SellSoldiersPrompt: ProximityPrompt = Workspace:WaitForChild("SellSoldiers"):WaitForChild("PromptPart"):WaitForChild("Prompt")
-local UnlockSlotsPrompt: ProximityPrompt = Workspace:WaitForChild("UnlockSlots"):WaitForChild("PromptPart"):WaitForChild("Prompt")
+-- TODO: Old workspace shop/prompt models removed in new map. Interactions now use
+-- ProximityPrompts on InteractionRings inside each plot. Wire these up when rings are implemented.
+local SoldierShopPrompt = nil
+local UpgradeShopPrompt = nil
+local SellSoldiersPrompt = nil
+local UnlockSlotsPrompt = nil
 
 local ActiveFrame = nil
 local ActiveFramePriority = nil
@@ -560,7 +563,7 @@ end)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
     local OwnsCommanderPass = false
     if PlayerData.Plot and PlayerData.Plot.Unlocks then
-        OwnsCommanderPass = PlayerData.Plot.Unlocks.Slot7 == true
+        OwnsCommanderPass = PlayerData.Plot.Unlocks.Slot8 == true
     end
 
     CommanderPassHidden = OwnsCommanderPass
@@ -571,68 +574,31 @@ LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
     end
 end)
 
-SoldierShopPrompt.PromptShown:Connect(function()
-    if PromptedFrameDebounces[SoldierShopFrame] then return end
+-- Maps UI identifiers (sent from server via OpenUIEvent) to their frame instances.
+local UI_NAME_TO_FRAME = {
+    ["SoldierShop"]    = SoldierShopFrame,
+    ["UpgradeTarget"]  = UpgradeTargetFrame,
+    ["SellSoldiers"]   = SellSoldiersFrame,
+    ["UnlockSlot"]     = UnlockSlotFrame,
+    ["StarterPack"]    = StarterPackFrame,
+    ["CommanderPass"]  = CommanderPassFrame,
+    -- Boost, Rebirth, UnlockRebirthLane, UnlockCommanderLane: stubs until those systems exist
+}
 
-    if SoldierShopFrame.Visible == true then return end
-
-    PromptedFrameDebounces[SoldierShopFrame] = true
-    OpenFrame(SoldierShopFrame)
-
-    task.wait(.5)
-    PromptedFrameDebounces[SoldierShopFrame] = false
-end)
-SoldierShopPrompt.PromptHidden:Connect(function()
-	if SoldierShopFrame.Visible == false then return end
-	CloseFrame(SoldierShopFrame)
-end)
-
-UpgradeShopPrompt.PromptShown:Connect(function()
-	if PromptedFrameDebounces[UpgradeTargetFrame] then return end
-
-	if UpgradeTargetFrame.Visible == true then return end
-
-	PromptedFrameDebounces[UpgradeTargetFrame] = true
-	OpenFrame(UpgradeTargetFrame)
-
-	task.wait(.5)
-	PromptedFrameDebounces[UpgradeTargetFrame] = false
-end)
-UpgradeShopPrompt.PromptHidden:Connect(function()
-	if UpgradeTargetFrame.Visible == false then return end
-	CloseFrame(UpgradeTargetFrame)
-end)
-
-SellSoldiersPrompt.PromptShown:Connect(function()
-	if PromptedFrameDebounces[SellSoldiersFrame] then return end
-
-	if SellSoldiersFrame.Visible == true then return end
-
-	PromptedFrameDebounces[SellSoldiersFrame] = true
-	OpenFrame(SellSoldiersFrame)
-
-	task.wait(.5)
-	PromptedFrameDebounces[SellSoldiersFrame] = false
-end)
-SellSoldiersPrompt.PromptHidden:Connect(function()
-	if SellSoldiersFrame.Visible == false then return end
-	CloseFrame(SellSoldiersFrame)
-end)
-
-UnlockSlotsPrompt.PromptShown:Connect(function()
-	if PromptedFrameDebounces[UnlockSlotFrame] then return end
-
-	if UnlockSlotFrame.Visible == true then return end
-
-	PromptedFrameDebounces[UnlockSlotFrame] = true
-	OpenFrame(UnlockSlotFrame)
-
-	task.wait(.5)
-	PromptedFrameDebounces[UnlockSlotFrame] = false
-end)
-UnlockSlotsPrompt.PromptHidden:Connect(function()
-	if UnlockSlotFrame.Visible == false then return end
-	CloseFrame(UnlockSlotFrame)
+-- Receives ring trigger from server and opens the corresponding UI frame.
+OpenUIEvent.OnClientEvent:Connect(function(UIName: string)
+    local Frame = UI_NAME_TO_FRAME[UIName]
+    if Frame then
+        if PromptedFrameDebounces[Frame] then return end
+        if Frame.Visible then return end
+        PromptedFrameDebounces[Frame] = true
+        OpenFrame(Frame)
+        task.wait(0.5)
+        PromptedFrameDebounces[Frame] = false
+    else
+        -- Stub rings (Boost, Rebirth, etc.) — do nothing for now
+        warn("[UI] No frame mapped for UI: " .. tostring(UIName))
+    end
 end)
 
 NotifyBindable.Event:Connect(Notify)

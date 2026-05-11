@@ -222,8 +222,8 @@ return {
         Type = "Gamepass",
         Id = SETTINGS.COMMANDER_PASS.ProductId,
         OnGrant = function(Player: Player, PlayerData: table)
-            -- One-time unlock of slot 7 for commander pass owners
-            PlayerData.Plot.Unlocks.Slot7 = true
+            -- Commander Pass unlocks lane 8 specifically (lane 7 = rebirth token)
+            PlayerData.Plot.Unlocks.Slot8 = true
         end,
     },
 }

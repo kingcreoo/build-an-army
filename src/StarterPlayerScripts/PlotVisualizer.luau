@@ -38,6 +38,17 @@ local LocalPlayer = Players.LocalPlayer
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local FireSoldierEvent: RemoteEvent = Remotes:WaitForChild("FireSoldier")
 local UpdateSettingBindable: BindableEvent = Remotes:WaitForChild("UpdateSettingBindable")
+local PlotAssignmentEvent: RemoteEvent = Remotes:WaitForChild("PlotAssignment")
+
+-- Maps Player.Name -> "Plot1".."Plot6". Populated by PlotAssignmentEvent from server.
+local PlayerPlots = {}
+
+-- Resolves the workspace plot folder for a given player name. Returns nil if not yet assigned.
+local function GetPlotForPlayer(PlayerName: string): Instance?
+    local PlotName = PlayerPlots[PlayerName]
+    if not PlotName then return nil end
+    return Workspace:WaitForChild("Plots"):FindFirstChild(PlotName)
+end
 
 -- // Functions
 
@@ -230,13 +241,15 @@ end
 
 local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     -- 1) Get soldier and target models
-    local Plot = Workspace:WaitForChild("Plots"):WaitForChild(PlayerName)
-    if not Plot then
-        return 0
-    end
+    local Plot = GetPlotForPlayer(PlayerName)
+    if not Plot then return 0 end
 
-    local SoldierModel = Plot.Soldiers:FindFirstChild(SoldierID)
-    local TargetModel = Plot.Targets:FindFirstChild("Target" .. string.sub(TargetSlot, 5))
+    local SoldiersFolder = Plot:FindFirstChild("Soldiers")
+    local TargetsFolder = Plot:FindFirstChild("Targets")
+    if not SoldiersFolder or not TargetsFolder then return 0 end
+
+    local SoldierModel = SoldiersFolder:FindFirstChild(SoldierID)
+    local TargetModel = TargetsFolder:FindFirstChild("Target" .. string.sub(TargetSlot, 5))
 
     if not SoldierModel or not TargetModel then
         return 0
@@ -247,9 +260,17 @@ local function AnimateBullet(PlayerName, SoldierID, SoldierData, TargetSlot)
     local WeaponType = SETTINGS["SOLDIER_DATA"][SoldierData.Type]["WeaponType"]
     local BulletSpeed = WeaponInfo["BulletSpeed"]
 
-    -- 3) Calculate common values
+    -- 3) Calculate common values using new map spawn anchors
     local TargetPosition = TargetModel.Target.Position
-    local Distance = (Plot.Info.Target1.Position - Plot.Info.Slot1.Position).Magnitude
+    local Spawns = Plot:FindFirstChild("Spawns")
+    local Distance = 55 -- fallback
+    if Spawns then
+        local S1 = Spawns:WaitForChild("SoldierSpawn1", 5)
+        local T1 = Spawns:WaitForChild("TargetSpawn1", 5)
+        if S1 and T1 then
+            Distance = (T1.Position - S1.Position).Magnitude
+        end
+    end
     local SoldierCFrame = SoldierModel:GetPrimaryPartCFrame()
 
     -- 4) Handle based on weapon type
@@ -361,9 +382,9 @@ local function DestroyTarget(InfoTable: table)
     Targets[PlayerName][SlotName].State = "Dead"
 
     -- 3) Hide target model
-    local Plot = Workspace:WaitForChild("Plots"):WaitForChild(PlayerName)
+    local Plot = GetPlotForPlayer(PlayerName)
     local TargetSlot = string.sub(SlotName, 5)  -- Extract "1" from "Slot1"
-    local TargetModel = Plot.Targets:FindFirstChild("Target" .. TargetSlot)
+    local TargetModel = Plot and Plot:FindFirstChild("Targets") and Plot:FindFirstChild("Targets"):FindFirstChild("Target" .. TargetSlot)
     local PartsToRegenerate = {}
     if TargetModel then
         for _, Inst in pairs(TargetModel:GetChildren()) do
@@ -454,8 +475,9 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
         -- TODO soldier fire animations
 
         -- 2) Reset status bar
-        local Plot = Workspace:WaitForChild("Plots"):WaitForChild(InfoTable.PlayerName)
-        local SoldierModel = Plot.Soldiers:FindFirstChild(InfoTable.SoldierID)
+        local Plot = GetPlotForPlayer(InfoTable.PlayerName)
+        local SoldiersFolder = Plot and Plot:FindFirstChild("Soldiers")
+        local SoldierModel = SoldiersFolder and SoldiersFolder:FindFirstChild(InfoTable.SoldierID)
         if SoldierModel then
             ResetStatusBar(SoldierModel, InfoTable.SoldierData)
         end
@@ -478,7 +500,8 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
 
         --Animate healthbar
         local TargetSlot = string.sub(InfoTable.SoldierData.Slot, 5)
-        local TargetModel = Plot.Targets:FindFirstChild("Target" .. TargetSlot)
+        local TargetsFolder = Plot and Plot:FindFirstChild("Targets")
+        local TargetModel = TargetsFolder and TargetsFolder:FindFirstChild("Target" .. TargetSlot)
         local TargetType = TargetTypes[InfoTable.PlayerName]
 
         local SoldierType = InfoTable.SoldierData.Type
@@ -521,7 +544,9 @@ RunService.Heartbeat:Connect(function()
 
         for SoldierID, SoldierData in pairs(PlayerSoldiers) do
             -- 0) Preliminary checking
-            if not Workspace.Plots[PlayerName].Soldiers:FindFirstChild(SoldierID) then
+            local _CheckPlot = GetPlotForPlayer(PlayerName)
+            local _CheckSoldiers = _CheckPlot and _CheckPlot:FindFirstChild("Soldiers")
+            if not _CheckSoldiers or not _CheckSoldiers:FindFirstChild(SoldierID) then
                 SoldierTimers[SoldierID] = nil
                 continue
             end
@@ -629,8 +654,9 @@ function PlotVisualizer.ClearSoldier(Player: Player, Slot: string)
         end
 
         -- 1) Remove soldier model from workspace
-        local Plot = Workspace:WaitForChild("Plots"):WaitForChild(Player.Name)
-        local SoldierModel = Plot.Soldiers:FindFirstChild(SoldierIDToRemove)
+        local Plot = GetPlotForPlayer(Player.Name)
+        local SoldiersFolder = Plot and Plot:FindFirstChild("Soldiers")
+        local SoldierModel = SoldiersFolder and SoldiersFolder:FindFirstChild(SoldierIDToRemove)
         if SoldierModel then
             SoldierModel:Destroy()
         end
@@ -639,34 +665,11 @@ function PlotVisualizer.ClearSoldier(Player: Player, Slot: string)
         Soldiers[Player.Name][SoldierIDToRemove] = nil
         SoldierTimers[SoldierIDToRemove] = nil
 
-        -- 3) Update lanes table
+        -- 3) Clear lane entry (dict; no reindexing — gaps are valid)
         local SlotNumber = tonumber(string.sub(Slot, 5))
         Lanes[Player.Name][SlotNumber] = nil
     end
-
-    -- 3) Reindex remaining soldiers by moving higher slots down
-    local RemovedSlotNumber = tonumber(string.sub(Slot, 5))
-    for SoldierID, SoldierData in pairs(Soldiers[Player.Name]) do
-        local CurrentSlotNumber = tonumber(string.sub(SoldierData.Slot, 5))
-        if CurrentSlotNumber > RemovedSlotNumber then
-            -- Move soldier down one slot
-            local NewSlotNumber = CurrentSlotNumber - 1
-            SoldierData.Slot = "Slot" .. NewSlotNumber
-
-            -- Update lanes table
-            Lanes[Player.Name][NewSlotNumber] = SoldierID
-            Lanes[Player.Name][CurrentSlotNumber] = nil
-
-            -- Animate movement to new position if model exists
-            local Plot = Workspace:WaitForChild("Plots"):WaitForChild(Player.Name)
-            local SoldierModel = Plot.Soldiers:FindFirstChild(SoldierID)
-            if SoldierModel then
-                local NewPosition = Plot.SoldierSlots["Slot" .. NewSlotNumber].CFrame * CFrame.Angles(0, math.rad(-90), 0) + Vector3.new(0, 2.5, 0)
-
-                SoldierModel:SetPrimaryPartCFrame(NewPosition)
-            end
-        end
-    end
+    -- No reindexing: ActiveSoldiers is now a dict keyed by lane number, gaps are intentional.
 end
 
 function PlotVisualizer.SetSoldier(Player: Player, SlotNumber: string, SoldierID: string, SoldierData: table)
@@ -679,15 +682,22 @@ function PlotVisualizer.SetSoldier(Player: Player, SlotNumber: string, SoldierID
     end
 
     -- 1) Define variables
-    local Plot = Workspace:WaitForChild("Plots"):WaitForChild(Player.Name)
+    local Plot = GetPlotForPlayer(Player.Name)
+    if not Plot then
+        warn("[PlotVisualizer] SetSoldier: no plot assigned for " .. Player.Name)
+        return
+    end
+    local SoldiersFolder = Plot:FindFirstChild("Soldiers") or Instance.new("Folder", Plot)
+    SoldiersFolder.Name = "Soldiers"
     local SoldierModel = SoldierModels:WaitForChild(SoldierData["Model"]):Clone()
 
-    -- 2) Remove existing soldier
+    -- 2) Remove existing soldier in this slot
     local ExistingSoldierID = Lanes[Player.Name][tonumber(string.sub(SlotNumber, 5))]
     if ExistingSoldierID then
         Soldiers[Player.Name][ExistingSoldierID] = nil
         SoldierTimers[ExistingSoldierID] = nil
-        Plot:WaitForChild("Soldiers"):WaitForChild(ExistingSoldierID):Destroy()
+        local Existing = SoldiersFolder:FindFirstChild(ExistingSoldierID)
+        if Existing then Existing:Destroy() end
     end
 
     -- 3) Promise
@@ -707,8 +717,16 @@ function PlotVisualizer.SetSoldier(Player: Player, SlotNumber: string, SoldierID
             end
         end
     end
-    SoldierModel:SetPrimaryPartCFrame(Plot:WaitForChild("SoldierSlots"):WaitForChild(SlotNumber).CFrame * CFrame.Angles(0, math.rad(-90), 0) + Vector3.new(0,2.5,0))
-    SoldierModel.Parent = Plot:WaitForChild("Soldiers")
+    -- Position soldier at the correct spawn anchor (SoldierSpawn1-8 in plot.Spawns)
+    local LaneNum = string.sub(SlotNumber, 5)
+    local Spawns = Plot:WaitForChild("Spawns", 10)
+    local SpawnAnchor = Spawns and Spawns:WaitForChild("SoldierSpawn" .. LaneNum, 5)
+    if SpawnAnchor then
+        SoldierModel:PivotTo(SpawnAnchor.CFrame * CFrame.Angles(0, math.rad(0), 0) + Vector3.new(0, 1.4, 0))
+    else
+        warn("[PlotVisualizer] SoldierSpawn" .. LaneNum .. " not found on " .. Plot.Name)
+    end
+    SoldierModel.Parent = SoldiersFolder
     local SoldierStats = SETTINGS.SOLDIER_DATA[SoldierData.Type]
     if not SoldierStats then
         warn("[PlotVisualizer] Unknown soldier type: " .. tostring(SoldierData.Type) .. ", skipping")
@@ -750,33 +768,56 @@ function PlotVisualizer.SetTarget(Player: Player, UnlockedLanes: table, TargetTy
     end
 
     -- 1) Define variables
-    local Plot = Workspace:WaitForChild("Plots"):WaitForChild(Player.Name)
+    local Plot = GetPlotForPlayer(Player.Name)
+    if not Plot then
+        warn("[PlotVisualizer] SetTarget: no plot assigned for " .. Player.Name)
+        return
+    end
     local ModelName = SETTINGS["TARGET_DATA"][TargetType]["Model"]
     local TargetModelType = TargetModels:WaitForChild(ModelName)
 
     -- 2) Remove existing targets
-    local ExistingTargetType = TargetTypes[Player.Name]
-    if ExistingTargetType then
-        for _, Target in pairs(Plot:WaitForChild("Targets"):GetChildren()) do
-            Target:Destroy()
-            -- TODO create clean animation
-        end
+    local TargetsFolder = Plot:FindFirstChild("Targets")
+    if not TargetsFolder then
+        TargetsFolder = Instance.new("Folder")
+        TargetsFolder.Name = "Targets"
+        TargetsFolder.Parent = Plot
+    end
+    for _, Target in pairs(TargetsFolder:GetChildren()) do
+        Target:Destroy()
     end
 
-    -- 3) Set new targets
+    -- 3) Set new targets using TargetSpawn1-8 anchors in plot.Spawns
+    local Spawns = Plot:WaitForChild("Spawns", 10)
     TargetTypes[Player.Name] = TargetType
     for _, SlotName in pairs(UnlockedLanes) do
+        local LaneNum = string.sub(SlotName, 5)
+        local SpawnAnchor = Spawns and Spawns:WaitForChild("TargetSpawn" .. LaneNum, 5)
         local TargetModel = TargetModelType:Clone()
-        TargetModel:SetPrimaryPartCFrame(Plot:WaitForChild("TargetSlots"):WaitForChild(SlotName).CFrame * CFrame.Angles(0, math.rad(90), 0) + Vector3.new(0, 2.5, 0))
-        TargetModel.Name = "Target" .. string.sub(SlotName, 5)
-        TargetModel.Parent = Plot:WaitForChild("Targets")
+        if SpawnAnchor then
+            TargetModel:PivotTo(SpawnAnchor.CFrame * CFrame.Angles(0, math.rad(180), 0) + Vector3.new(0, 1.4, 0))
+        else
+            warn("[PlotVisualizer] TargetSpawn" .. LaneNum .. " not found on " .. Plot.Name)
+        end
+        TargetModel.Name = "Target" .. LaneNum
+        TargetModel.Parent = TargetsFolder
         AddHealthBar(TargetModel, TargetType)
 
-        Targets[Player.Name][SlotName] = {["Health"] = SETTINGS["TARGET_DATA"][TargetType]["TotalHealth"], ["RespawnTime"] = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"], ["State"] = "Alive"}
+        Targets[Player.Name][SlotName] = {
+            ["Health"] = SETTINGS["TARGET_DATA"][TargetType]["TotalHealth"],
+            ["RespawnTime"] = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"],
+            ["State"] = "Alive"
+        }
     end
 end
 
 -- // Events
+
+-- Receives plot assignment from server so we can resolve Workspace.Plots[PlotName].
+PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
+    PlayerPlots[PlayerName] = PlotName
+end)
+
 Players.PlayerAdded:Connect(function(Player: Player) 
     Lanes[Player.Name] = {}
     Soldiers[Player.Name] = {}
@@ -790,6 +831,7 @@ Players.PlayerRemoving:Connect(function(Player: Player)
     TargetTypes[Player.Name] = nil
     Targets[Player.Name] = nil
     DueDeaths[Player.Name] = nil
+    PlayerPlots[Player.Name] = nil
 end)
 
 FireSoldierEvent.OnClientEvent:Connect(function(InfoTable: table)
