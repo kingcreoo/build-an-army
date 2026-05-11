@@ -61,6 +61,7 @@ local UnlockSlotEvent: RemoteEvent = Remotes:WaitForChild("UnlockSlot")
 local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 local PlotAssignmentEvent: RemoteEvent = EnsureRemoteEvent("PlotAssignment")
 local OpenUIEvent: RemoteEvent = EnsureRemoteEvent("OpenUI")
+local CloseUIEvent: RemoteEvent = EnsureRemoteEvent("CloseUI")
 
 -- // Functions
 local function RNGStock(Rarity)
@@ -381,8 +382,54 @@ local RING_TO_UI = {
     ["UnlockCommanderLaneRing"] = "UnlockCommanderLane",
 }
 
--- Wires every InteractionRing ProximityPrompt in the player's plot to fire OpenUI to that player.
--- Only the plot owner can trigger their own rings.
+-- Toggles the UnlockLaneRing on/off and updates its price label based on next unlockable slot.
+-- Call this on join and after each successful unlock.
+local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
+    local PlayerData = Data.Get(Player)
+    local Ring = PlotFolder:FindFirstChild("InteractionRings") and PlotFolder.InteractionRings:FindFirstChild("UnlockLaneRing")
+    if not Ring then return end
+
+    local GuiParts = Ring:FindFirstChild("GuiParts")
+    local Prompt = GuiParts and GuiParts:FindFirstChildOfClass("ProximityPrompt")
+    local RingPart = Ring:FindFirstChild("RingPart")
+    local FadePart = Ring:FindFirstChild("FadePart")
+    local PriceGui = GuiParts and GuiParts:FindFirstChild("Price")
+    local LabelGui = GuiParts and GuiParts:FindFirstChild("Label")
+
+    -- Find next credit-purchasable slot (4-6)
+    local NextSlot = nil
+    for i = 4, 6 do
+        if not PlayerData.Plot.Unlocks["Slot" .. i] then
+            NextSlot = i
+            break
+        end
+    end
+
+    local Visible = NextSlot ~= nil
+
+    -- Toggle ring visibility
+    if Prompt then Prompt.Enabled = Visible end
+    if RingPart then RingPart.Transparency = Visible and 0 or 1 end
+    if FadePart then
+        local Decal = FadePart:FindFirstChildOfClass("Decal")
+        if Decal then Decal.Transparency = Visible and 0.8 or 1 end
+    end
+    local Emitter = RingPart and RingPart:FindFirstChildOfClass("ParticleEmitter")
+    if Emitter then Emitter.Enabled = Visible end
+    if LabelGui then LabelGui.Enabled = Visible end
+    if PriceGui then
+        PriceGui.Enabled = Visible
+        if Visible and NextSlot then
+            local PriceLabel = PriceGui:FindFirstChildOfClass("TextLabel")
+            if PriceLabel then
+                PriceLabel.Text = "$" .. tostring(SETTINGS.SLOT_PRICES[NextSlot])
+            end
+        end
+    end
+end
+
+-- Wires every InteractionRing ProximityPrompt in the player's plot.
+-- Triggered fires OpenUI; PromptHidden fires CloseUI. Only plot owner can interact.
 local function SetupRings(Player: Player, PlotFolder: Instance)
     local Rings = PlotFolder:FindFirstChild("InteractionRings")
     if not Rings then
@@ -403,6 +450,9 @@ local function SetupRings(Player: Player, PlotFolder: Instance)
             OpenUIEvent:FireClient(Player, UIName)
         end)
     end
+
+    -- Set initial state of conditional rings
+    RefreshUnlockLaneRing(Player, PlotFolder)
 end
 
 local function OnPlayerAdded(Player: Player)
@@ -612,6 +662,9 @@ local function UnlockSlot(Player: Player)
     -- Show the newly unlocked collect pad and wire its touch handler
     PlayerPlotManagers[Player.Name]:OnLaneUnlocked(NextSlot)
 
+    -- Refresh the unlock ring (may hide it if all 4-6 are now unlocked)
+    RefreshUnlockLaneRing(Player, PlayerPlotManagers[Player.Name].Plot)
+
     -- Refresh targets so the new lane gets a target
     local ActiveTarget = PlayerData.Inventory.ActiveTarget
     PlayerPlotManagers[Player.Name]:SetTarget(ActiveTarget)
@@ -709,6 +762,24 @@ CommanderPassEvent.OnServerEvent:Connect(function(Player: Player, Action: string
     CommanderPassOpenStates[Player.Name] = false
     CommanderPassTouchCooldowns[Player.Name] = os.clock() + 7
 end)
+
+-- Returns the player's assigned plot name. Used by client scripts that miss
+-- the PlotAssignmentEvent on join due to load order.
+local GetPlotNameFunction: RemoteFunction = Remotes:FindFirstChild("GetPlotName") or (function()
+    local F = Instance.new("RemoteFunction")
+    F.Name = "GetPlotName"
+    F.Parent = Remotes
+    return F
+end)()
+GetPlotNameFunction.OnServerInvoke = function(Player: Player)
+    local Timeout = 10
+    local Elapsed = 0
+    while not PlayerPlots[Player.Name] and Elapsed < Timeout do
+        task.wait(0.1)
+        Elapsed += 0.1
+    end
+    return PlayerPlots[Player.Name]
+end
 
 -- Returns player data, waiting until it is loaded if needed
 GetPlayerDataFunction.OnServerInvoke = function(Player: Player)

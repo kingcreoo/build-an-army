@@ -23,47 +23,163 @@ local CollectCashEvent: RemoteEvent = Remotes:WaitForChild("CollectCash")
 local PlotAssignmentEvent: RemoteEvent = Remotes:WaitForChild("PlotAssignment")
 
 local SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
+local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 
 -- Maps Player.Name -> PlotName for resolving the local player's plot folder.
 local LocalPlayerPlot = nil
 
+-- Tracks local player's active soldiers per lane and active target for DPS display.
+-- { [LaneNum] = SoldierData } and ActiveTarget string
+local LocalActiveSoldiers = {}
+local LocalActiveTarget = nil
+
 PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
     if PlayerName == LocalPlayer.Name then
         LocalPlayerPlot = PlotName
+        print("[Client] Plot assigned: " .. PlotName)
+
+        -- Reset all CashToCollectGui labels to $0 immediately on join, overriding Studio placeholder
+        task.spawn(function()
+            local Plot = workspace:WaitForChild("Plots"):WaitForChild(PlotName, 10)
+            if not Plot then return end
+            local CashCollectors = Plot:WaitForChild("CashCollectors", 10)
+            if not CashCollectors then return end
+            for _, PadModel in ipairs(CashCollectors:GetChildren()) do
+                local GuiParts = PadModel:FindFirstChild("GuiParts")
+                if GuiParts then
+                    local CashToCollectGui = GuiParts:FindFirstChild("CashToCollectGui")
+                    if CashToCollectGui then
+                        local Label = CashToCollectGui:FindFirstChildOfClass("TextLabel")
+                        if Label then Label.Text = "$0" end
+                    end
+                end
+            end
+            print("[Client] Reset all collect pad labels to $0")
+        end)
     end
 end)
 
 -- // Functions
 
-local function OnSetSoldier(Player: Player, SlotNumber: string, SoldierID: string, SoldierData: table)
-    -- 1) Check for public animations being disabled
-    if Player ~= LocalPlayer and not PublicAnimations then return end
+-- Calculates cash-per-second for a soldier type against the current active target.
+local function CalculateLaneDPS(SoldierType: string, TargetType: string): number
+    local SoldierStats = SETTINGS.SOLDIER_DATA[SoldierType]
+    local TargetData = SETTINGS.TARGET_DATA[TargetType]
+    if not SoldierStats or not TargetData then return 0 end
 
-    -- 2) Set the soldier
+    local WeaponInfo = SoldierStats.WeaponInfo
+    local WeaponType = SoldierStats.WeaponType
+    local Damage = WeaponInfo.Damage
+
+    -- Bullets per trigger pull (mirrors RewardLoop/IdleRewards logic)
+    local BulletsPerShot = 1
+    if WeaponType == "Burst" then
+        BulletsPerShot = WeaponInfo.Bullets or 1
+    elseif WeaponType == "Dual" then
+        BulletsPerShot = 2
+    end
+
+    local EffectiveDamage = Damage * BulletsPerShot
+    local ShotsToKill = math.ceil(TargetData.TotalHealth / EffectiveDamage)
+    local KillTime = (ShotsToKill - 1) * WeaponInfo.FireRate
+    local TravelTime = SETTINGS.DISTANCES.Worlds.Default / WeaponInfo.BulletSpeed
+    local CycleTime = KillTime + TravelTime + TargetData.TotalRespawnTime
+
+    return TargetData.Reward / CycleTime
+end
+
+-- Updates the CashPerSecondGui on a single lane's collect pad.
+local function RefreshLaneDPS(LaneNum: number)
+    if not LocalPlayerPlot then
+        -- Plot not assigned yet; retry once it is
+        task.spawn(function()
+            local Elapsed = 0
+            while not LocalPlayerPlot and Elapsed < 5 do
+                task.wait(0.1)
+                Elapsed += 0.1
+            end
+            RefreshLaneDPS(LaneNum)
+        end)
+        return
+    end
+    local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
+    if not Plot then return end
+    local CashCollectors = Plot:FindFirstChild("CashCollectors")
+    if not CashCollectors then return end
+    local PadModel = CashCollectors:FindFirstChild("CollectCash" .. LaneNum)
+    if not PadModel then return end
+    local GuiParts = PadModel:FindFirstChild("GuiParts")
+    if not GuiParts then return end
+    local DPSGui = GuiParts:FindFirstChild("CashPerSecondGui")
+    if not DPSGui then return end
+    local Label = DPSGui:FindFirstChildOfClass("TextLabel")
+    if not Label then return end
+
+    local SoldierData = LocalActiveSoldiers[LaneNum]
+    if not SoldierData or not LocalActiveTarget then
+        Label.Text = "$0/s"
+        return
+    end
+
+    local DPS = CalculateLaneDPS(SoldierData.Type, LocalActiveTarget)
+    Label.Text = "$" .. string.format("%.1f", DPS) .. "/s"
+end
+
+local function OnSetSoldier(Player: Player, SlotNumber: string, SoldierID: string, SoldierData: table)
+    if Player ~= LocalPlayer and not PublicAnimations then return end
     PlotVisualizer.SetSoldier(Player, SlotNumber, SoldierID, SoldierData)
 
-    -- 3) Start soldier animation loop
+    -- Track for DPS display and refresh that lane
+    if Player == LocalPlayer then
+        local LaneNum = tonumber(string.sub(SlotNumber, 5))
+        if LaneNum then
+            LocalActiveSoldiers[LaneNum] = SoldierData
+            RefreshLaneDPS(LaneNum)
+        end
+    end
 end
 
 local function OnSetTarget(Player: Player, UnlockedLanes: table, TargetType: string)
-    -- 1) Check for public animations being disabled
     if Player ~= LocalPlayer and not PublicAnimations then return end
-
-    -- 2) Set the targets
     PlotVisualizer.SetTarget(Player, UnlockedLanes, TargetType)
+
+    -- Track target and refresh all active lanes
+    if Player == LocalPlayer then
+        LocalActiveTarget = TargetType
+        for LaneNum in pairs(LocalActiveSoldiers) do
+            RefreshLaneDPS(LaneNum)
+        end
+    end
 end
 
 local function OnClearSoldier(Player: Player, Slot: string)
-    -- 1) Check for public animations being disabled
     if Player ~= LocalPlayer and not PublicAnimations then return end
-
-    -- 2) Clear the soldier
     PlotVisualizer.ClearSoldier(Player, Slot)
+
+    -- Clear tracking and reset DPS display
+    if Player == LocalPlayer then
+        local LaneNum = tonumber(string.sub(Slot, 5))
+        if LaneNum then
+            LocalActiveSoldiers[LaneNum] = nil
+            RefreshLaneDPS(LaneNum)
+        end
+    end
 end
 
 -- Updates a single collect pad's CashToCollectGui with the current pending amount.
 local function OnUpdateCollectPad(LaneNum: number, Amount: number)
-    if not LocalPlayerPlot then return end
+    if not LocalPlayerPlot then
+        -- Plot not assigned yet; retry once it is
+        task.spawn(function()
+            local Elapsed = 0
+            while not LocalPlayerPlot and Elapsed < 5 do
+                task.wait(0.1)
+                Elapsed += 0.1
+            end
+            OnUpdateCollectPad(LaneNum, Amount)
+        end)
+        return
+    end
     local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
     if not Plot then return end
     local CashCollectors = Plot:FindFirstChild("CashCollectors")

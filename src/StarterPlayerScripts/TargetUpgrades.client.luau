@@ -38,12 +38,47 @@ local CloseFrameBindable: BindableEvent = Remotes:WaitForChild("CloseFrame")
 local NotifyBindable: BindableEvent = Remotes:WaitForChild("NotifyBindable")
 
 local TargetModels = ReplicatedStorage:WaitForChild("Types"):WaitForChild("Targets")
+local PlotAssignmentEvent: RemoteEvent = Remotes:WaitForChild("PlotAssignment")
+local GetPlotNameFunction: RemoteFunction = Remotes:WaitForChild("GetPlotName")
 
--- TODO: Old workspace UpgradeShop model removed in new map. Target upgrade display
--- will be wired to UpgradeTargetRing + pedestal in the plot. Stubbed for now.
-local UpgradeShop = nil
-local UpgradeShopBase = nil
-local ShopAmountLabel = nil
+local ShopAmountLabel = nil -- no longer used; kept to avoid nil errors in old refs
+
+-- Resolves the local player's TargetUnlockPedastal from their assigned plot.
+-- We pull it eagerly via RemoteFunction since we may miss the broadcast event.
+local LocalPlayerPlot = nil
+
+task.spawn(function()
+    LocalPlayerPlot = GetPlotNameFunction:InvokeServer()
+end)
+
+PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
+    if PlayerName == LocalPlayer.Name then
+        LocalPlayerPlot = PlotName
+    end
+end)
+
+local function GetPedestal(): Instance?
+    if not LocalPlayerPlot then
+        print("[TargetUpgrades] GetPedestal: LocalPlayerPlot is nil")
+        return nil
+    end
+    local Plot = Workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
+    if not Plot then
+        print("[TargetUpgrades] GetPedestal: Plot not found: " .. LocalPlayerPlot)
+        return nil
+    end
+    local Build = Plot:FindFirstChild("Build")
+    if not Build then
+        print("[TargetUpgrades] GetPedestal: Build folder not found on " .. LocalPlayerPlot)
+        return nil
+    end
+    local Pedestal = Build:FindFirstChild("TargetUnlockPedastal")
+    if not Pedestal then
+        print("[TargetUpgrades] GetPedestal: TargetUnlockPedastal not found in Build")
+        return nil
+    end
+    return Pedestal
+end
 
 local Buttons = {YesButton, NoButton}
 
@@ -56,17 +91,18 @@ local PurchaseDebounce = false
 
 -- Displays the next target model and price at the UpgradeShop
 local function DisplayTarget(TargetType: string)
+	print("[TargetUpgrades] DisplayTarget called with: " .. TargetType)
 	-- Store next target for purchase reference
 	NextTargetType = TargetType
 
-	-- 1) Find & delete possible past display target
-	-- TODO: clear from TargetUnlockPedastal once rings are wired
-	if UpgradeShop then
-		local ExistingDisplay = UpgradeShop:FindFirstChild("DisplayTarget")
-		if ExistingDisplay then ExistingDisplay:Destroy() end
+	-- 1) Clear any existing display model from the pedestal
+	local Pedestal = GetPedestal()
+	if Pedestal then
+		local Existing = Pedestal:FindFirstChild("DisplayTarget")
+		if Existing then Existing:Destroy() end
 	end
 
-	-- 2) Clone & display new target at UpgradeShop
+	-- 2) Clone target model and place on top of the pedestal
 	local TargetModel: Model = TargetModels:FindFirstChild(TargetType)
 	if not TargetModel then
 		warn("Target model not found: " .. TargetType)
@@ -76,15 +112,27 @@ local function DisplayTarget(TargetType: string)
 	local DisplayModel = TargetModel:Clone()
 	DisplayModel.Name = "DisplayTarget"
 
-	-- TODO: Position display model on TargetUnlockPedastal in the plot once rings are wired.
-	-- DisplayModel:PivotTo(UpgradeShopBase.CFrame * CFrame.Angles(0, math.rad(180), 0) + Vector3.new(0, 3, 0))
-	-- DisplayModel.Parent = UpgradeShop
-
-	-- 3) Update the price display on the shop GUI
-	local Price = SETTINGS.TARGET_DATA[TargetType].Price
-	if ShopAmountLabel then ShopAmountLabel.Text = "$" .. Price end
+	if Pedestal then
+		-- Find the top surface of the pedestal (highest Y part)
+		local TopPart
+		local HighestY = -math.huge
+		for _, Child in ipairs(Pedestal:GetChildren()) do
+            if Child:IsA("BasePart") then
+                local TopY = Child.Position.Y + Child.Size.Y / 2
+                if TopY > HighestY then
+                    HighestY = TopY
+                    TopPart = Child
+                end
+            end
+        end
+        if TopPart then
+            DisplayModel:PivotTo(CFrame.new(TopPart.Position + Vector3.new(0, TopPart.Size.Y / 2 + 2.3, 0)) * CFrame.Angles(0, math.rad(180), 0))
+        end
+		DisplayModel.Parent = Pedestal
+	end
 
 	-- 4) Update the frame GUI elements
+	local Price = SETTINGS.TARGET_DATA[TargetType].Price
 	AmountLabel.Text = "$" .. Price
 	-- ViewImage.Image = SETTINGS.TARGET_DATA[TargetType].Image -- TODO: Add images to TARGET_DATA if needed
 end
@@ -94,8 +142,12 @@ local function DisplayComplete()
 	-- Clear next target reference
 	NextTargetType = nil
 
-	-- 1) Find & delete possible past display target
-	-- TODO: Clear from TargetUnlockPedastal once rings are wired.
+	-- 1) Clear display model from pedestal
+	local Pedestal = GetPedestal()
+	if Pedestal then
+		local Existing = Pedestal:FindFirstChild("DisplayTarget")
+		if Existing then Existing:Destroy() end
+	end
 
 	-- 2) Clone & display complete sign
 	-- TODO: Add complete sign model
@@ -214,5 +266,14 @@ LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
 end)
 
--- Pull player data from server
-ProcessPlayerData(GetPlayerDataFunction:InvokeServer())
+-- Pull player data from server; defer pedestal placement until plot is assigned
+task.spawn(function()
+    local PlayerData = GetPlayerDataFunction:InvokeServer()
+    -- Wait up to 5s for plot assignment before processing
+    local Elapsed = 0
+    while not LocalPlayerPlot and Elapsed < 5 do
+        task.wait(0.1)
+        Elapsed += 0.1
+    end
+    ProcessPlayerData(PlayerData)
+end)

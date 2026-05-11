@@ -83,6 +83,8 @@ local HUDBindable: BindableEvent = Remotes:WaitForChild("HUDBindable")
 local StarterPackEvent: RemoteEvent = Remotes:WaitForChild("StarterPackEvent")
 local CommanderPassEvent: RemoteEvent = Remotes:WaitForChild("CommanderPassEvent")
 local OpenUIEvent: RemoteEvent = Remotes:WaitForChild("OpenUI")
+local CloseUIEvent: RemoteEvent = Remotes:WaitForChild("CloseUI")
+local PlotAssignmentEvent: RemoteEvent = Remotes:WaitForChild("PlotAssignment")
 
 -- TODO: Old workspace shop/prompt models removed in new map. Interactions now use
 -- ProximityPrompts on InteractionRings inside each plot. Wire these up when rings are implemented.
@@ -584,6 +586,48 @@ local UI_NAME_TO_FRAME = {
     ["CommanderPass"]  = CommanderPassFrame,
     -- Boost, Rebirth, UnlockRebirthLane, UnlockCommanderLane: stubs until those systems exist
 }
+
+-- When the local player's plot is assigned, wire PromptHidden on every ring
+-- to close the corresponding frame when the player walks away.
+local RING_NAME_TO_UI = {
+    ["SoldierShopRing"]    = "SoldierShop",
+    ["UpgradeTargetRing"]  = "UpgradeTarget",
+    ["TrashCanRing"]       = "SellSoldiers",
+    ["UnlockLaneRing"]     = "UnlockSlot",
+    ["StarterPackRing"]    = "StarterPack",
+    ["CommanderPassRing"]  = "CommanderPass",
+}
+
+PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
+    if PlayerName ~= LocalPlayer.Name then return end
+
+    task.spawn(function()
+        local Plot = workspace:WaitForChild("Plots"):WaitForChild(PlotName, 10)
+        if not Plot then return end
+        local Rings = Plot:WaitForChild("InteractionRings", 10)
+        if not Rings then return end
+
+        print("[UI] Wiring PromptHidden for plot " .. PlotName)
+        local WiredCount = 0
+        for _, Ring in ipairs(Rings:GetChildren()) do
+            local UIName = RING_NAME_TO_UI[Ring.Name]
+            if not UIName then continue end
+            local GuiParts = Ring:FindFirstChild("GuiParts")
+            local Prompt = GuiParts and GuiParts:FindFirstChildOfClass("ProximityPrompt")
+            if not Prompt then continue end
+
+            WiredCount += 1
+            Prompt.PromptHidden:Connect(function()
+                print("[UI] PromptHidden fired for " .. Ring.Name .. " -> " .. UIName)
+                local Frame = UI_NAME_TO_FRAME[UIName]
+                if Frame and Frame.Visible then
+                    CloseFrame(Frame)
+                end
+            end)
+        end
+        print("[UI] Wired " .. WiredCount .. " ring prompts")
+    end)
+end)
 
 -- Receives ring trigger from server and opens the corresponding UI frame.
 OpenUIEvent.OnClientEvent:Connect(function(UIName: string)
