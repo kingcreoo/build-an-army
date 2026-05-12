@@ -23,6 +23,10 @@
       the only handler Roblox guarantees delivery for, even across server restarts.
     * Idempotency is enforced via PlayerData.Transactions.GrantedPurchases[PurchaseId]. A
       receipt is only marked granted AFTER its OnGrant runs and PlayerData is persisted.
+    * CRITICAL: PurchaseGranted is returned to Roblox ONLY after Data.Set confirms a successful
+      DataStore write. If the save fails, NotProcessedYet is returned and Roblox retries the
+      receipt — either later in the same session (where we re-attempt the save without re-running
+      OnGrant) or in the player's next session (where the grant runs fresh from a clean state).
     * If player data isn't loaded yet (offline purchase, data still fetching), we return
       NotProcessedYet and Roblox will retry the receipt later, preserving the purchase.
     * Unknown product IDs return NotProcessedYet (never PurchaseGranted) so Roblox keeps
@@ -31,6 +35,10 @@
     * Gamepass grants are idempotent via PlayerData.Transactions.AppliedPasses[PassName].
       The manager checks ownership on join and on live purchase, and applies OnGrant exactly
       once regardless of how many servers the player joins.
+    * Gamepass OnGrant handlers SHOULD be idempotent by construction (e.g. "set Slot8 = true").
+      If a persistent DataStore outage prevents the AppliedPasses stamp from ever being saved,
+      OnGrant will re-run on the player's next session. Non-idempotent grants (e.g. "+1000
+      credits") would double-apply in that rare scenario; design grants to be set-not-add.
 ]]
 
 -- // Define
@@ -137,8 +145,10 @@ local function LoadConfig()
     print("[TransactionManager] Registered " .. tostring(CountKeys(ProductsByName)) .. " products")
 end
 
--- Dev product grant handler: runs OnGrant and records the receipt as granted
-local function GrantDevProduct(Player: Player, Entry: table, PurchaseId: string): (boolean, string?)
+-- Dev product grant handler: runs OnGrant and persists. Returns true ONLY after a confirmed
+-- DataStore save. If the save fails, returns false so ProcessReceipt returns NotProcessedYet
+-- and Roblox retries the receipt (either later this session or in the player's next session).
+local function GrantDevProduct(Player: Player, Entry: table, PurchaseId: string): boolean
     local PlayerData = Data.Get(Player)
     if not PlayerData then
         return false
@@ -146,8 +156,17 @@ local function GrantDevProduct(Player: Player, Entry: table, PurchaseId: string)
 
     EnsureTransactionsScaffold(PlayerData)
 
-    -- Idempotency: if we've already granted this exact receipt, short-circuit
+    -- Idempotency: if we've already granted this receipt in memory, re-attempt the save
+    -- rather than short-circuiting to true. This catches the case where a prior call
+    -- ran OnGrant successfully but the save failed; we don't want to ack the receipt
+    -- until persistence is confirmed.
     if PlayerData.Transactions.GrantedPurchases[PurchaseId] then
+        local ResaveSuccess, ResaveErr = Data.Set(Player, PlayerData)
+        if not ResaveSuccess then
+            warn("[TransactionManager] Re-save failed for receipt " .. tostring(PurchaseId)
+                .. " (will retry): " .. tostring(ResaveErr))
+            return false
+        end
         return true
     end
 
@@ -158,18 +177,25 @@ local function GrantDevProduct(Player: Player, Entry: table, PurchaseId: string)
         return false
     end
 
-    -- Mark the receipt as granted BEFORE persisting, so the save includes it atomically
+    -- Stamp the receipt BEFORE persisting so the saved snapshot includes the grant marker
     PlayerData.Transactions.GrantedPurchases[PurchaseId] = true
 
-    -- Persist. Data.Set is synchronous and pcalls internally so it won't throw.
-    Data.Set(Player, PlayerData)
+    -- Persist. Capture the success boolean — we MUST NOT ack the receipt until the save lands.
+    local SaveSuccess, SaveErr = Data.Set(Player, PlayerData)
+    if not SaveSuccess then
+        warn("[TransactionManager] Save failed for receipt " .. tostring(PurchaseId)
+            .. " (will retry): " .. tostring(SaveErr))
+        return false
+    end
 
     -- Push updated data to client so UI refreshes (inventory, credits, etc.)
     LoadPlayerEvent:FireClient(Player, PlayerData, Entry.Name)
     return true
 end
 
--- Gamepass grant handler: idempotent via AppliedPasses flag
+-- Gamepass grant handler: idempotent via AppliedPasses flag. Returns true only after a
+-- confirmed save. On save failure the in-memory grant still applies for this session, but
+-- the stamp isn't persisted — OnGrant will re-run on the player's next session if needed.
 local function ApplyGamepassGrant(Player: Player, Entry: table): boolean
     local PlayerData = Data.Get(Player)
     if not PlayerData then
@@ -178,8 +204,15 @@ local function ApplyGamepassGrant(Player: Player, Entry: table): boolean
 
     EnsureTransactionsScaffold(PlayerData)
 
-    -- Already applied for this player; nothing to do
+    -- Idempotency: already applied in memory. Re-attempt save in case a prior call's
+    -- save failed, so the stamp eventually lands in the DataStore.
     if PlayerData.Transactions.AppliedPasses[Entry.Name] then
+        local ResaveSuccess, ResaveErr = Data.Set(Player, PlayerData)
+        if not ResaveSuccess then
+            warn("[TransactionManager] Gamepass re-save failed for '" .. Entry.Name
+                .. "': " .. tostring(ResaveErr))
+            return false
+        end
         return true
     end
 
@@ -190,32 +223,52 @@ local function ApplyGamepassGrant(Player: Player, Entry: table): boolean
     end
 
     PlayerData.Transactions.AppliedPasses[Entry.Name] = true
-    Data.Set(Player, PlayerData)
+
+    local SaveSuccess, SaveErr = Data.Set(Player, PlayerData)
+    if not SaveSuccess then
+        warn("[TransactionManager] Gamepass save failed for '" .. Entry.Name
+            .. "': " .. tostring(SaveErr))
+        return false
+    end
+
     LoadPlayerEvent:FireClient(Player, PlayerData, Entry.Name)
     return true
 end
 
--- Checks gamepass ownership via Roblox API, with pcall and caching per player
+-- Checks gamepass ownership via Roblox API with bounded retry. Caches success results only;
+-- transient API failures are NOT cached (so we keep trying until we get a definitive answer).
+local OWNERSHIP_CHECK_ATTEMPTS = 3
+local OWNERSHIP_CHECK_BACKOFFS = {1, 2} -- seconds between attempts 1->2 and 2->3
 local function CheckGamepassOwnership(Player: Player, PassId: number): boolean
     local CacheKey = Player.Name
     if OwnershipCache[CacheKey] and OwnershipCache[CacheKey][PassId] ~= nil then
         return OwnershipCache[CacheKey][PassId]
     end
 
-    local Success, Owns = pcall(function()
-        return MarketplaceService:UserOwnsGamePassAsync(Player.UserId, PassId)
-    end)
+    local LastErr: any = nil
+    for Attempt = 1, OWNERSHIP_CHECK_ATTEMPTS do
+        local Success, Owns = pcall(function()
+            return MarketplaceService:UserOwnsGamePassAsync(Player.UserId, PassId)
+        end)
 
-    if not Success then
-        warn("[TransactionManager] UserOwnsGamePassAsync failed for " .. Player.Name .. " pass " .. tostring(PassId))
-        return false
+        if Success then
+            if not OwnershipCache[CacheKey] then
+                OwnershipCache[CacheKey] = {}
+            end
+            OwnershipCache[CacheKey][PassId] = Owns
+            return Owns
+        end
+
+        LastErr = Owns
+        if Attempt < OWNERSHIP_CHECK_ATTEMPTS then
+            task.wait(OWNERSHIP_CHECK_BACKOFFS[Attempt] or 1)
+        end
     end
 
-    if not OwnershipCache[CacheKey] then
-        OwnershipCache[CacheKey] = {}
-    end
-    OwnershipCache[CacheKey][PassId] = Owns
-    return Owns
+    warn("[TransactionManager] UserOwnsGamePassAsync failed for " .. Player.Name
+        .. " pass " .. tostring(PassId) .. " after " .. tostring(OWNERSHIP_CHECK_ATTEMPTS)
+        .. " attempts: " .. tostring(LastErr))
+    return false
 end
 
 -- ProcessReceipt callback registered with MarketplaceService
