@@ -184,8 +184,9 @@ local function DeactivateSoldier(SoldierID)
         return
     end
 
-    -- 3) If the response is good, simply update the inventory with the new data
+    -- 3) If the response is good, update inventory and broadcast so other UIs (e.g. SellSoldiers) sync
     UpdateInventory(PlayerData)
+    UpdateInventoryBindable:Fire(PlayerData)
 end
 
 local function ActivateSoldier(SoldierID)
