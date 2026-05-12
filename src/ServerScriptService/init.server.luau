@@ -477,8 +477,13 @@ local function SetupRings(Player: Player, PlotFolder: Instance)
 end
 
 local function OnPlayerAdded(Player: Player)
-    -- 1) Load player's data
+    -- 1) Load player's data. Data.Initialize kicks on a DataStore outage so we never
+    --    hand the player default data and overwrite their real save when they leave.
     local PlayerData, NewPlayer = Data.Initialize(Player)
+    if not PlayerData then
+        return -- Player has been kicked
+    end
+
     SessionStartTimes[Player.Name] = os.time()
     print(Player.Name .. " has joined. Their data:")
     print(PlayerData)

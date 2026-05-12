@@ -4,6 +4,8 @@
 local SETTINGS = {}
 
 SETTINGS.DEFAULT_DATA = {
+    -- Schema version. Bump alongside any migration logic in Data.luau:ApplyMigrations.
+    ["_Version"] = 1,
     ["leaderstats"] = {
         ["Credits"] = 100
     },
@@ -34,13 +36,25 @@ SETTINGS.DEFAULT_DATA = {
         ["AppliedPasses"] = {}
     },
     ["Stats"] = {
-        ["PlayTimeSeconds"] = 0
+        ["PlayTimeSeconds"] = 0,
+        -- Highest rebirth count reached (never decreases, even if rebirth count is reset)
+        ["HighestRebirth"] = 0
     },
     ["Offers"] = {
         ["StarterPackPurchased"] = false
     },
     -- Per-lane pending cash keyed by lane number (1-8). Persists between sessions.
-    ["PendingCash"] = {}
+    ["PendingCash"] = {},
+    -- Rebirth scaffolding. Filled in when the rebirth system lands.
+    ["Rebirths"] = 0,
+    ["RebirthTokens"] = 0,
+    -- Boost scaffolding. Active = timed boosts with ExpiresAt; Permanent = non-expiring.
+    -- Shape per entry: { Type = "CashMultiplier" | "DamageMultiplier" | "FireRateMultiplier",
+    --                    Amount = number, Source = string, ExpiresAt = number? }
+    ["Boosts"] = {
+        ["Active"] = {},
+        ["Permanent"] = {}
+    }
 }
 
 -- Shared placeholder art references; real assets get swapped per-soldier later

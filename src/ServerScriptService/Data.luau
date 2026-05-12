@@ -1,24 +1,42 @@
 -- // Data, initialized by KingCreoo on 8-19-2025
--- // Module for managing player data persistence
+-- // Player data persistence: load on join, save on leave, save on shutdown.
+-- // All persistent writes go through UpdateAsync with bounded retry.
+-- // On load failure the player is kicked rather than handed default data
+-- // (avoids the classic Roblox data-wipe bug from a transient outage).
 
 local Data = {}
-local Players = game:GetService("Players")
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- // Services
+local Players = game:GetService("Players")
 local DataStoreService = game:GetService("DataStoreService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
+-- // Modules
 local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 
-local DataStore = DataStoreService:GetDataStore("PlayerData_v2")
+-- // Variables
+local DataStore = DataStoreService:GetDataStore("PlayerData_v4")
+
+local CURRENT_DATA_VERSION = 1
+local LOAD_ATTEMPTS = 3
+local SAVE_ATTEMPTS = 3
+local LOAD_BACKOFFS = {0.5, 1.5} -- seconds between load attempts 1->2 and 2->3
+local SAVE_BACKOFFS = {1.0, 3.0} -- seconds between save attempts 1->2 and 2->3
+local SHUTDOWN_BUDGET_SECONDS = 25 -- Roblox allows ~30s in BindToClose
 
 local Database = {}
 
--- Deep-clone a table so DEFAULT_DATA isn't mutated
-local function DeepCopy(Table: table)
-    local Copy = {}
+-- // Local helpers
 
+-- Recursively clones a table so callers can mutate without touching the original
+local function DeepCopy(Table: any): any
+    if type(Table) ~= "table" then
+        return Table
+    end
+
+    local Copy = {}
     for K, V in pairs(Table) do
         if type(V) == "table" then
             Copy[K] = DeepCopy(V)
@@ -26,7 +44,6 @@ local function DeepCopy(Table: table)
             Copy[K] = V
         end
     end
-
     return Copy
 end
 
@@ -45,79 +62,172 @@ local function ApplyDefaults(Target: table, Defaults: table)
     end
 end
 
--- Handle gathering player's data upon joining the game
-function Data.Initialize(Player: Player)
-    local PlayerData
-    local NewPlayer
-
-    local Success, ErrorMessage = pcall(function()
-        PlayerData = DataStore:GetAsync("Player_" .. Players:GetUserIdFromNameAsync(Player.Name))
-    end)
-
-    if not Success then
-        warn(ErrorMessage)
-    end
-
-    if not PlayerData then
-        PlayerData = DeepCopy(Settings.DEFAULT_DATA)
-        NewPlayer = true
-    else
-        ApplyDefaults(PlayerData, Settings.DEFAULT_DATA)
-    end
-
-    Database[Player.Name] = PlayerData
-
-    return PlayerData, NewPlayer
+-- Bumps any older save to the current schema version. Future migrations slot in here.
+local function ApplyMigrations(PlayerData: table)
+    local Version = PlayerData._Version or 0
+    -- while Version < CURRENT_DATA_VERSION do
+    --     if Version == 1 then
+    --         -- ... migrate 1 -> 2 in place
+    --     end
+    --     Version += 1
+    -- end
+    PlayerData._Version = CURRENT_DATA_VERSION
 end
 
--- Handle setting player's data after changes
-function Data.Set(Player: Player, PlayerData: table, DontSave: boolean)
-    Database[Player.Name] = PlayerData
-
-    local Leaderstats = Player:FindFirstChild("leaderstats")
-    if Leaderstats then
-        for Stat, Value in pairs(PlayerData["leaderstats"]) do
-            local StatObject = Leaderstats:FindFirstChild(Stat)
-            if StatObject then
-                StatObject.Value = Value
-            end
+-- Reads a player's save with bounded retry. Returns (data, errored). data may be nil for a fresh player.
+local function LoadWithRetry(UserId: number): (any, boolean, string?)
+    local LastErr: string? = nil
+    for Attempt = 1, LOAD_ATTEMPTS do
+        local Success, Result = pcall(function()
+            return DataStore:GetAsync("Player_" .. UserId)
+        end)
+        if Success then
+            return Result, false, nil
+        end
+        LastErr = tostring(Result)
+        if Attempt < LOAD_ATTEMPTS then
+            task.wait(LOAD_BACKOFFS[Attempt] or 1)
         end
     end
+    return nil, true, LastErr
+end
 
-    if DontSave then
-        return
+-- Atomic per-key write with bounded retry. Returns (success, error).
+local function SaveWithRetry(UserId: number, PlayerData: table): (boolean, string?)
+    local LastErr: string? = nil
+    for Attempt = 1, SAVE_ATTEMPTS do
+        local Success, Result = pcall(function()
+            DataStore:UpdateAsync("Player_" .. UserId, function(_OldData)
+                -- Transform function must not yield. Wholesale overwrite is intentional:
+                -- the in-memory copy is the authoritative version for this session.
+                return PlayerData
+            end)
+        end)
+        if Success then
+            return true, nil
+        end
+        LastErr = tostring(Result)
+        if Attempt < SAVE_ATTEMPTS then
+            task.wait(SAVE_BACKOFFS[Attempt] or 1)
+        end
     end
+    return false, LastErr
+end
 
-    local Success, ErrorMessage = pcall(function()
-        DataStore:SetAsync("Player_" .. Players:GetUserIdFromNameAsync(Player.Name), PlayerData)
-    end)
+-- Pushes leaderstats values from PlayerData onto the player's existing leaderstats folder
+local function SyncLeaderstats(Player: Player, PlayerData: table)
+    local Leaderstats = Player:FindFirstChild("leaderstats")
+    if not Leaderstats then return end
 
-    if not Success then
-        warn(ErrorMessage)
+    for Stat, Value in pairs(PlayerData["leaderstats"]) do
+        local StatObject = Leaderstats:FindFirstChild(Stat)
+        if StatObject then
+            StatObject.Value = Value
+        end
     end
 end
 
--- Returns player's data from the database
-function Data.Get(Player: Player)
+-- // Module functions
+
+-- Loads player data on join. KICKS on load failure so a transient outage never overwrites real data.
+-- Returns (PlayerData, NewPlayer). If the kick path runs, returns (nil, false) and caller must bail.
+function Data.Initialize(Player: Player): (table?, boolean)
+    local LoadedData, Errored, ErrorMessage = LoadWithRetry(Player.UserId)
+
+    if Errored then
+        warn("[Data] Load failed for " .. Player.Name .. ": " .. tostring(ErrorMessage))
+        Player:Kick("Failed to load your data. Please rejoin in a moment.")
+        return nil, false
+    end
+
+    local NewPlayer: boolean
+    if LoadedData == nil then
+        LoadedData = DeepCopy(Settings.DEFAULT_DATA)
+        NewPlayer = true
+    else
+        ApplyDefaults(LoadedData, Settings.DEFAULT_DATA)
+        ApplyMigrations(LoadedData)
+        NewPlayer = false
+    end
+
+    Database[Player.Name] = LoadedData
+    return LoadedData, NewPlayer
+end
+
+-- Writes player data. Returns (success, error). DontSave=true skips persistence and always returns true.
+function Data.Set(Player: Player, PlayerData: table, DontSave: boolean?): (boolean, string?)
+    Database[Player.Name] = PlayerData
+    SyncLeaderstats(Player, PlayerData)
+
+    if DontSave then
+        return true, nil
+    end
+
+    local Success, ErrorMessage = SaveWithRetry(Player.UserId, PlayerData)
+    if not Success then
+        warn("[Data] Save failed for " .. Player.Name .. ": " .. tostring(ErrorMessage))
+    end
+    return Success, ErrorMessage
+end
+
+-- Returns the in-memory player data table (reference, not a copy)
+function Data.Get(Player: Player): table?
     return Database[Player.Name]
 end
 
--- Removes player's data from the database
-function Data.Remove(Player: Player)
-    local PlayerData = DeepCopy(Database[Player.Name])
+-- Saves and removes a player's data on leave. Captures LogOff + PendingCash before write.
+-- Returns (success, error). Database entry is cleared regardless of save outcome.
+function Data.Remove(Player: Player): (boolean, string?)
+    local Existing = Database[Player.Name]
+    if not Existing then
+        return true, nil
+    end
+
+    -- Deep-clone before mutating so we don't disturb the live in-memory copy if save retries
+    local PlayerData = DeepCopy(Existing)
     PlayerData["LogOff"] = os.time()
-    PlayerData["PendingCash"] = RewardLoop.GetPendingCash(Player.Name)
-    print("Removing " .. Player.Name .. ". Their data:")
-    print(PlayerData)
+    -- Deep-clone PendingCash too — RewardLoop wipes its own table 5s after PlayerRemoving
+    PlayerData["PendingCash"] = DeepCopy(RewardLoop.GetPendingCash(Player.Name))
+
     Database[Player.Name] = nil
 
-    local Success, ErrorMessage = pcall(function()
-        DataStore:SetAsync("Player_" .. Players:GetUserIdFromNameAsync(Player.Name), PlayerData)
-    end)
-
+    local Success, ErrorMessage = SaveWithRetry(Player.UserId, PlayerData)
     if not Success then
-        warn(ErrorMessage)
+        warn("[Data] Final save failed for " .. Player.Name .. ": " .. tostring(ErrorMessage))
     end
+    return Success, ErrorMessage
 end
+
+-- // Shutdown handler
+
+-- Flushes every in-memory save when the server shuts down. Saves run in parallel within Roblox's budget.
+-- In practice this only catches players whose PlayerRemoving hasn't run yet; Data.Remove is idempotent
+-- (no-ops when Database entry is already cleared).
+game:BindToClose(function()
+    local Threads: {thread} = {}
+    for PlayerName in pairs(Database) do
+        local Player = Players:FindFirstChild(PlayerName)
+        if Player then
+            local Thread = task.spawn(function()
+                Data.Remove(Player)
+            end)
+            table.insert(Threads, Thread)
+        end
+    end
+
+    -- Wait for all save threads to finish or our budget to run out
+    local Deadline = os.clock() + SHUTDOWN_BUDGET_SECONDS
+    while os.clock() < Deadline do
+        local AnyAlive = false
+        for _, Thread in ipairs(Threads) do
+            if coroutine.status(Thread) ~= "dead" then
+                AnyAlive = true
+                break
+            end
+        end
+        if not AnyAlive then break end
+        task.wait(0.1)
+    end
+end)
 
 return Data
