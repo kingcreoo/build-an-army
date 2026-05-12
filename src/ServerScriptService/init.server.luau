@@ -15,6 +15,7 @@ local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 local IdleRewards = require(ServerScriptService:WaitForChild("Server"):WaitForChild("IdleRewards"))
 local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
+local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
 
 -- // Variables
 local Plots = Workspace:WaitForChild("Plots")
@@ -634,20 +635,25 @@ local function SellSoldier(Player: Player, SoldierID: string)
         end
     end
 
-    -- 4) Check soldier is not special
+    -- 4) Guard against stale/renamed soldier types that no longer exist in SOLDIER_DATA
     local SoldierType = SoldierData["Type"]
+    if not SETTINGS.SOLDIER_DATA[SoldierType] then
+        return "Invalid", nil
+    end
+
+    -- 5) Check soldier is not special
     if SETTINGS.SOLDIER_DATA[SoldierType]["Special"] then
         return "Special", nil
     end
 
-    -- 5) Get sell value and add credits
+    -- 6) Get sell value and add credits
     local SellValue = SETTINGS.SOLDIER_DATA[SoldierType]["SellValue"]
     PlayerData["leaderstats"]["Credits"] += SellValue
 
-    -- 6) Remove soldier from inventory
+    -- 7) Remove soldier from inventory
     PlayerData["Inventory"]["SoldierInventory"][SoldierID] = nil
 
-    -- 7) Save data
+    -- 8) Save data
     Data.Set(Player, PlayerData)
 
     return "Sold", PlayerData
@@ -723,30 +729,50 @@ GetStockFunction.OnServerInvoke = function()
 end
 
 PurchaseSoldierFunction.OnServerInvoke = function(Player: Player, Type: string)
+    -- 3 purchases per 5s — prevents rapid-fire purchase spam
+    if not RateLimit.Check(Player, "PurchaseSoldier", 3, 5) then
+        return "RateLimit"
+    end
     local Arg1, Arg2 = PurchaseSoldier(Player, Type)
 
     return Arg1, Arg2
 end
 
 ActivateSoldierFunction.OnServerInvoke = function(Player: Player, SoldierID: string)
+    -- 8 activations per 5s — generous for AutoEquip bulk-placing soldiers
+    if not RateLimit.Check(Player, "ActivateSoldier", 8, 5) then
+        return false, nil
+    end
     local Arg1, Arg2 = PlayerPlotManagers[Player.Name]:Activate(SoldierID)
 
     return Arg1, Arg2
 end
 
 DeactivateSoldierFunction.OnServerInvoke = function(Player: Player, SoldierID: string)
+    -- 8 deactivations per 5s — mirrors activate limit
+    if not RateLimit.Check(Player, "DeactivateSoldier", 8, 5) then
+        return false, nil
+    end
     local Arg1, Arg2 = PlayerPlotManagers[Player.Name]:Deactivate(SoldierID)
 
     return Arg1, Arg2
 end
 
 UpdateSettingFunction.OnServerInvoke = function(Player: Player, Item: string)
+    -- 5 setting changes per 5s — settings are low-frequency by design
+    if not RateLimit.Check(Player, "UpdateSetting", 5, 5) then
+        return false, nil, "RateLimit"
+    end
 	local Arg1, Arg2, Arg3, Arg4 = UpdateSetting(Player, Item)
 
 	return Arg1, Arg2, Arg3, Arg4
 end
 
 UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)
+    -- 2 target upgrades per 5s — upgrades are deliberate one-at-a-time actions
+    if not RateLimit.Check(Player, "UpgradeTarget", 2, 5) then
+        return
+    end
 	local Response, NextNextTarget = PurchaseTarget(Player)
 
 	if Response == "Purchased" then
@@ -762,11 +788,19 @@ UpgradeTargetEvent.OnServerEvent:Connect(function(Player: Player)
 end)
 
 SellSoldierEvent.OnServerEvent:Connect(function(Player: Player, SoldierID: string)
+    -- 5 sells per 5s — selling a full inventory quickly is legitimate
+    if not RateLimit.Check(Player, "SellSoldier", 5, 5) then
+        return
+    end
 	local Response, PlayerData = SellSoldier(Player, SoldierID)
 	SellSoldierEvent:FireClient(Player, Response, PlayerData)
 end)
 
 UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
+    -- 1 unlock per 3s — unlocks are one-at-a-time by design
+    if not RateLimit.Check(Player, "UnlockSlot", 1, 3) then
+        return
+    end
 	local Response, PlayerData = UnlockSlot(Player)
 	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
 end)

@@ -18,7 +18,7 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
 local SetSoldierBindable: BindableEvent = Remotes:WaitForChild("SetSoldierBindable")
 local SetTargetBindable: BindableEvent = Remotes:WaitForChild("SetTargetBindable")
-local SyncTablesFunction: RemoteFunction = Remotes:WaitForChild("SyncTables")
+
 local FireSoldierEvent: RemoteEvent = Remotes:WaitForChild("FireSoldier")
 local ClearSoldierBindable: BindableEvent = Remotes:WaitForChild("ClearSoldierBindable")
 
@@ -408,10 +408,6 @@ function RewardLoop.ClaimRewards(Player: Player, LaneNum: number)
     NotifyCollectPad(Player, LaneNum)
 end
 
-function RewardLoop.SyncTables()
-    return Soldiers, Targets, Timers, PendingRewards
-end
-
 -- // Events
 Players.PlayerRemoving:Connect(OnPlayerRemoving)
 SetSoldierBindable.Event:Connect(function(PlayerName: string, Slot: string, SoldierID: string, SoldierData: table)
@@ -420,9 +416,6 @@ end)
 SetTargetBindable.Event:Connect(function(PlayerName: string, UnlockedLanes: table, TargetType: string)
     RewardLoop.SetTarget(PlayerName, UnlockedLanes, TargetType)
 end)
-SyncTablesFunction.OnServerInvoke = function()
-    return RewardLoop.SyncTables()
-end
 ClearSoldierBindable.Event:Connect(function(PlayerName: string, Slot: string)
     RewardLoop.ClearSoldier(PlayerName, Slot)
 end)

@@ -12,6 +12,7 @@ local Players = game:GetService("Players")
 -- // Modules
 local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local Data = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Data"))
+local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
 
 -- // Variables
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -153,7 +154,13 @@ end
 
 -- // Events
 
-IdleRewardsEvent.OnServerEvent:Connect(IdleRewards.ClaimRewards)
+-- 1 idle claim per 10s — this is a one-time-per-session action; repeated fires are spam
+IdleRewardsEvent.OnServerEvent:Connect(function(Player: Player)
+    if not RateLimit.Check(Player, "IdleRewards", 1, 10) then
+        return
+    end
+    IdleRewards.ClaimRewards(Player)
+end)
 
 -- // Return
 return IdleRewards
