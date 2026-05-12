@@ -38,27 +38,6 @@ PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName:
         LocalPlayerPlot = PlotName
         print("[Client] Plot assigned: " .. PlotName)
 
-        -- Destroy all ProximityPrompts on every plot that isn't ours.
-        -- Client-side Enabled=false is ignored by Roblox for server-owned prompts, so we destroy.
-        task.spawn(function()
-            local PlotsFolder = workspace:WaitForChild("Plots", 10)
-            if not PlotsFolder then return end
-            for _, OtherPlot in ipairs(PlotsFolder:GetChildren()) do
-                if OtherPlot.Name ~= PlotName then
-                    local Rings = OtherPlot:FindFirstChild("InteractionRings")
-                    if Rings then
-                        for _, Ring in ipairs(Rings:GetChildren()) do
-                            local GuiParts = Ring:FindFirstChild("GuiParts")
-                            if GuiParts then
-                                local Prompt = GuiParts:FindFirstChildOfClass("ProximityPrompt")
-                                if Prompt then Prompt:Destroy() end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-
         -- Reset all CashToCollectGui labels to $0 immediately on join, overriding Studio placeholder
         task.spawn(function()
             local Plot = workspace:WaitForChild("Plots"):WaitForChild(PlotName, 10)

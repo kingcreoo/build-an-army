@@ -452,6 +452,20 @@ end
 
 -- Wires every InteractionRing ProximityPrompt in the player's plot.
 -- Triggered fires OpenUI; PromptHidden fires CloseUI. Only plot owner can interact.
+-- Enables or disables every InteractionRing ProximityPrompt on a plot.
+-- Used to ensure only the plot owner can see/trigger prompts.
+local function SetPlotPromptsEnabled(PlotFolder: Instance, Enabled: boolean)
+    local Rings = PlotFolder:FindFirstChild("InteractionRings")
+    if not Rings then return end
+    for _, Ring in ipairs(Rings:GetChildren()) do
+        local GuiParts = Ring:FindFirstChild("GuiParts")
+        if GuiParts then
+            local Prompt = GuiParts:FindFirstChildOfClass("ProximityPrompt")
+            if Prompt then Prompt.Enabled = Enabled end
+        end
+    end
+end
+
 local function SetupRings(Player: Player, PlotFolder: Instance)
     local Rings = PlotFolder:FindFirstChild("InteractionRings")
     if not Rings then
@@ -521,8 +535,15 @@ local function OnPlayerAdded(Player: Player)
     local PlayerPlot = Plot.new(Player, PlayerData, PlotName)
     PlayerPlotManagers[Player.Name] = PlayerPlot
 
-    -- 2c) Wire interaction rings to open UIs for this player
+    -- 2c) Wire interaction rings to open UIs for this player.
+    -- Also disable prompts on every other plot so they don't show for this player.
     SetupRings(Player, PlayerPlot.Plot)
+    for _, OtherPlotName in ipairs(PLOT_NAMES) do
+        if OtherPlotName ~= PlotName then
+            local OtherPlot = Plots:FindFirstChild(OtherPlotName)
+            if OtherPlot then SetPlotPromptsEnabled(OtherPlot, false) end
+        end
+    end
 
     -- 3) Initialize player's leaderstats
     InitializeLeaderstats(Player, PlayerData)
@@ -579,6 +600,9 @@ local function OnPlayerRemoving(Player: Player)
     local PlotName = PlayerPlots[Player.Name]
     if PlotName then
         PlotAssignments[PlotName] = nil
+        -- Re-enable prompts on the freed plot so the next player assigned here can use them
+        local FreedPlot = Plots:FindFirstChild(PlotName)
+        if FreedPlot then SetPlotPromptsEnabled(FreedPlot, true) end
     end
     PlayerPlots[Player.Name] = nil
 
