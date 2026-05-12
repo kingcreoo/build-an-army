@@ -8,7 +8,6 @@ local Workspace = game:GetService("Workspace")
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
@@ -214,10 +213,8 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 	end
 end)
 
--- Handle future LoadPlayerEvent fires (reconnects, etc)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
 end)
 
--- Pull player data from server
-ProcessPlayerData(GetPlayerDataFunction:InvokeServer())
+

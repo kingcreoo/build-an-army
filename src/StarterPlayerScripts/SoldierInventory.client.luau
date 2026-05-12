@@ -343,6 +343,3 @@ end)
 UpdateInventoryBindable.Event:Connect(UpdateInventory)
 ActivateBindable.Event:Connect(ActivateSoldier)
 DeactivateBindable.Event:Connect(DeactivateSoldier)
-
--- Pull player data from server
-ProcessPlayerData(GetPlayerDataFunction:InvokeServer())

@@ -65,12 +65,41 @@ end
 -- Bumps any older save to the current schema version. Future migrations slot in here.
 local function ApplyMigrations(PlayerData: table)
     local Version = PlayerData._Version or 0
-    -- while Version < CURRENT_DATA_VERSION do
-    --     if Version == 1 then
-    --         -- ... migrate 1 -> 2 in place
-    --     end
-    --     Version += 1
-    -- end
+
+    if Version < 1 then
+        -- Soldier rename migration: commit 72ccf08 renamed soldiers without a migration.
+        -- Any save written before that commit has the old type strings in SoldierInventory.
+        local RenameMap = {
+            ["The Grunt"]     = "Grunt",
+            ["The Shotgunner"] = "Shotgunner",
+            ["The Heavy"]     = "Heavy",
+            ["The Dual"]      = "Dualie",
+        }
+        local Inventory = PlayerData.Inventory and PlayerData.Inventory.SoldierInventory
+        if Inventory then
+            for _, SoldierData in pairs(Inventory) do
+                local NewName = RenameMap[SoldierData.Type]
+                if NewName then
+                    SoldierData.Type = NewName
+                end
+            end
+        end
+        -- Also fix ActiveSoldiers if stored as old compact array (pre-dict format)
+        -- ActiveSoldiers was previously a compact array; now it's a dict keyed by lane number.
+        -- If we find numeric sequential keys starting at 1 with no gaps, rewrite as dict.
+        local Active = PlayerData.Inventory and PlayerData.Inventory.ActiveSoldiers
+        if Active then
+            local IsCompactArray = Active[1] ~= nil
+            if IsCompactArray then
+                local NewActive = {}
+                for i, SoldierID in ipairs(Active) do
+                    NewActive[i] = SoldierID
+                end
+                PlayerData.Inventory.ActiveSoldiers = NewActive
+            end
+        end
+    end
+
     PlayerData._Version = CURRENT_DATA_VERSION
 end
 

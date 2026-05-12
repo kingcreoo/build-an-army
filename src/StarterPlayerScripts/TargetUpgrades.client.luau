@@ -16,7 +16,6 @@ local LocalPlayer = Players.LocalPlayer
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 local UpgradeTargetEvent: RemoteEvent = Remotes:WaitForChild("UpgradeTarget")
 
 local LocalGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -261,19 +260,6 @@ local function ProcessPlayerData(PlayerData: table)
 	end
 end
 
--- Handle future LoadPlayerEvent fires (reconnects, etc)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
-end)
-
--- Pull player data from server; defer pedestal placement until plot is assigned
-task.spawn(function()
-    local PlayerData = GetPlayerDataFunction:InvokeServer()
-    -- Wait up to 5s for plot assignment before processing
-    local Elapsed = 0
-    while not LocalPlayerPlot and Elapsed < 5 do
-        task.wait(0.1)
-        Elapsed += 0.1
-    end
-    ProcessPlayerData(PlayerData)
 end)

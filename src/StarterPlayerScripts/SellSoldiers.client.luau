@@ -8,7 +8,6 @@ local TweenService = game:GetService("TweenService")
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 
 -- // Modules
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
@@ -365,12 +364,8 @@ SellSoldierEvent.OnClientEvent:Connect(function(Response: string, PlayerData: ta
 	end
 end)
 
--- Handle future LoadPlayerEvent fires (reconnects, etc)
 LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
 	ProcessPlayerData(PlayerData)
 end)
 
 UpdateInventoryBindable.Event:Connect(UpdateInventory)
-
--- Pull player data from server
-ProcessPlayerData(GetPlayerDataFunction:InvokeServer())

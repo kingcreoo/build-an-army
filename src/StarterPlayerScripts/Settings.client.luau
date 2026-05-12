@@ -14,7 +14,6 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 
 local LoadPlayerEvent: RemoteEvent = Remotes:WaitForChild("LoadPlayer")
-local GetPlayerDataFunction: RemoteFunction = Remotes:WaitForChild("GetPlayerData")
 local UpdateSettingFunction: RemoteFunction = Remotes:WaitForChild("UpdateSetting")
 local UpdateSettingBindable: BindableEvent = Remotes:WaitForChild("UpdateSettingBindable")
 local ButtonExpandBindable: BindableEvent = Remotes:WaitForChild("ButtonExpand")
@@ -135,6 +134,3 @@ end)
 LoadPlayerEvent.OnClientEvent:Connect(LoadSettings)
 
 UpdateSettingBindable.Event:Connect(UpdateItem)
-
--- Pull player data from server
-LoadSettings(GetPlayerDataFunction:InvokeServer())
