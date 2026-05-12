@@ -103,6 +103,7 @@ end
 
 local function RegenerateHealthBar(TargetModel: Model, TargetType: string)
     -- 1) Get health bar and necessary data
+    if not TargetModel or not TargetModel:FindFirstChild("BarParent") then return end
     local HealthBar = TargetModel:FindFirstChild("BarParent"):FindFirstChild("HealthBar")
     if not HealthBar then return end
 

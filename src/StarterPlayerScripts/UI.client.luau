@@ -406,7 +406,7 @@ SettingsButton.MouseButton1Click:Connect(function()
 
 	SOUND_MANAGER:PlayClick()
 
-	if ActiveFrame == SettingsDB then
+	if ActiveFrame == SettingsFrame then
 		CloseFrame(SettingsFrame)
 	else
 		OpenFrame(SettingsFrame)

@@ -79,6 +79,11 @@ local function AddReward(InfoTable: table)
     local PlayerName = InfoTable.PlayerName
     local Slot = InfoTable.SoldierData.Slot
 
+    -- Guard against player leaving during bullet flight
+    if not Targets[PlayerName] or not Targets[PlayerName][Slot] or not TargetTypes[PlayerName] then
+        return
+    end
+
     -- 0) Check that this target is still applied
     if TargetTypes[PlayerName] ~= Targets[PlayerName][Slot].Type then
         return
@@ -103,6 +108,9 @@ local function AddReward(InfoTable: table)
     -- 3) Schedule respawn
     local RespawnTime = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"]
     task.delay(RespawnTime, function()
+        if not Targets[PlayerName] or not Targets[PlayerName][Slot] then
+            return
+        end
         Targets[PlayerName][Slot].State = "Alive"
         Targets[PlayerName][Slot].Health = SETTINGS["TARGET_DATA"][TargetType]["TotalHealth"]
     end)
