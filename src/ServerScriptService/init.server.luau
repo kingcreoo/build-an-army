@@ -382,6 +382,23 @@ local RING_TO_UI = {
     ["UnlockCommanderLaneRing"] = "UnlockCommanderLane",
 }
 
+-- Positions the UnlockLaneRing at the requested slot using the nearest SoldierSpawn offset.
+local function MoveUnlockLaneRingToSlot(PlotFolder: Instance, Ring: Model, SlotNumber: number)
+    local Spawns = PlotFolder:FindFirstChild("Spawns")
+    if not Spawns then return end
+
+    local RingPivot = Ring:GetPivot()
+
+    local TargetSpawn = Spawns:FindFirstChild("SoldierSpawn" .. SlotNumber)
+    if not (TargetSpawn and TargetSpawn:IsA("BasePart")) then return end
+
+    -- Preserve ring rotation, keep original Y, and place at SoldierSpawn X/Z + 8 studs on X.
+    local RotationOnly = RingPivot - RingPivot.Position
+    local TargetPosition = Vector3.new(TargetSpawn.Position.X - 8, RingPivot.Position.Y, TargetSpawn.Position.Z)
+    local TargetCFrame = CFrame.new(TargetPosition) * RotationOnly
+    Ring:PivotTo(TargetCFrame)
+end
+
 -- Toggles the UnlockLaneRing on/off and updates its price label based on next unlockable slot.
 -- Call this on join and after each successful unlock.
 local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
@@ -406,6 +423,10 @@ local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
     end
 
     local Visible = NextSlot ~= nil
+
+    if Visible and NextSlot then
+        MoveUnlockLaneRingToSlot(PlotFolder, Ring, NextSlot)
+    end
 
     -- Toggle ring visibility
     if Prompt then Prompt.Enabled = Visible end
