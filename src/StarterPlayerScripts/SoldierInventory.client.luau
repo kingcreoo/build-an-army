@@ -221,8 +221,9 @@ local function ActivateSoldier(SoldierID)
         return
     end
 
-    -- 4) If the response is good, update the inventory
+    -- 4) If the response is good, update inventory and broadcast so other UIs sync
     UpdateInventory(PlayerData)
+    UpdateInventoryBindable:Fire(PlayerData)
 end
 
 local function UpdateAE(On: boolean)
@@ -264,9 +265,10 @@ local function ChangeAE()
         LatestData["Settings"]["AutoEquip"] = On
     end
 
-    -- Refresh inventory UI if AutoEquip changed active soldiers
+    -- Refresh inventory UI if AutoEquip changed active soldiers, and broadcast to other UIs
     if PlayerData then
         UpdateInventory(PlayerData)
+        UpdateInventoryBindable:Fire(PlayerData)
     end
 
     task.delay(1, function()

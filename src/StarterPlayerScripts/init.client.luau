@@ -38,7 +38,8 @@ PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName:
         LocalPlayerPlot = PlotName
         print("[Client] Plot assigned: " .. PlotName)
 
-        -- Disable all ProximityPrompts on every plot that isn't ours so they don't appear at all
+        -- Destroy all ProximityPrompts on every plot that isn't ours.
+        -- Client-side Enabled=false is ignored by Roblox for server-owned prompts, so we destroy.
         task.spawn(function()
             local PlotsFolder = workspace:WaitForChild("Plots", 10)
             if not PlotsFolder then return end
@@ -50,7 +51,7 @@ PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName:
                             local GuiParts = Ring:FindFirstChild("GuiParts")
                             if GuiParts then
                                 local Prompt = GuiParts:FindFirstChildOfClass("ProximityPrompt")
-                                if Prompt then Prompt.Enabled = false end
+                                if Prompt then Prompt:Destroy() end
                             end
                         end
                     end
