@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **README.md** Provides a clear explanation of this game's core concept & an outline of some features. It speaks in the future tense about this game for when it is completed.
 
-**STUDIO.md** Provides an outline of where things are located in ROBLOX studio. This is updated by the human who manages claude and this repo whenever things are changed in studio, along with a git commit.
+**maker_output.txt** Ground truth for the Studio hierarchy (workspace, ReplicatedStorage, StarterGui). Generated on demand by running the MAKER script in Studio. Read this file when you need to verify instance names, paths, or part sizes. Do not preemptively load it — it is large. Reference it only when a task requires knowing what exists in Studio.
 
 ## Code & comment conventions
 
@@ -40,7 +40,7 @@ For testing, we use a basic tool called TestEZ that allows for testing of ROBLOX
 
 ## Roblox studio specifics
 
-The human who manages claude (and any other AI Agent) is constantly updating the STUDIO.md file as anything is updated (as previously mentioned). This file contains a map of all parts in the workspace, replicatedstorage, and even in the startergui. When you reference a part (for example: ReplicatedStorage.Types.Soldiers.Grunt) you can check inside of STUDIO.md to see where it's located.
+The human who manages claude (and any other AI Agent) is constantly updating the STUDIO.md file as anything is updated (as previously mentioned). This file contains a map of all parts in the workspace, replicatedstorage, and even in the startergui. When you reference a part (for example: ReplicatedStorage.Types.Soldiers.Grunt) you can check inside of maker_output.txt to see where it's located.
 
 All remotes (RemoteEvents, RemoteFunctions, and bindables) are located in ReplicatedStorage.Remotes.
 

@@ -493,11 +493,15 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
 
         -- 5) Health bar logic (only for non-null bullets)
         local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]["Damage"]
-        
-        -- Use server's target health for sync (server is source of truth)
-        local CurrentHealth = InfoTable.SoldierData.TargetHealth or Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
 
-        Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].Health = CurrentHealth - Damage
+        -- Guard against FireSoldier arriving before SetTarget populates the local tracking table
+        local SlotData = Targets[InfoTable.PlayerName] and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]
+        local CurrentHealth = InfoTable.SoldierData.TargetHealth or (SlotData and SlotData["Health"])
+        if not CurrentHealth then continue end
+
+        if SlotData then
+            SlotData.Health = CurrentHealth - Damage
+        end
 
         --Animate healthbar
         local TargetSlot = string.sub(InfoTable.SoldierData.Slot, 5)
@@ -506,7 +510,7 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
         local TargetType = TargetTypes[InfoTable.PlayerName]
 
         local SoldierType = InfoTable.SoldierData.Type
-        if CurrentHealth - Damage <= 0 and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot].State == "Alive" then
+        if CurrentHealth - Damage <= 0 and SlotData and SlotData.State == "Alive" then
             DueDeaths[InfoTable.PlayerName][InfoTable.SoldierData.Slot] = true
             task.delay(TimeToHit, function()
                 SpawnHitmarkers(TargetModel, SoldierModel, SoldierType, Damage)
@@ -690,7 +694,12 @@ function PlotVisualizer.SetSoldier(Player: Player, SlotNumber: string, SoldierID
     end
     local SoldiersFolder = Plot:FindFirstChild("Soldiers") or Instance.new("Folder", Plot)
     SoldiersFolder.Name = "Soldiers"
-    local SoldierModel = SoldierModels:WaitForChild(SoldierData["Model"]):Clone()
+    local SoldierModelTemplate = SoldierModels:WaitForChild(SoldierData["Model"], 10)
+    if not SoldierModelTemplate then
+        warn("[PlotVisualizer] Soldier model not found: " .. tostring(SoldierData["Model"]))
+        return
+    end
+    local SoldierModel = SoldierModelTemplate:Clone()
 
     -- 2) Remove existing soldier in this slot
     local ExistingSoldierID = Lanes[Player.Name][tonumber(string.sub(SlotNumber, 5))]

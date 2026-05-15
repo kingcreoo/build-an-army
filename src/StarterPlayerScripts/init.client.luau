@@ -4,6 +4,7 @@
 -- // Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 -- // Modules
 local PlotVisualizer = require(script.PlotVisualizer)
@@ -202,7 +203,7 @@ SetTargetEvent.OnClientEvent:Connect(OnSetTarget)
 ClearSoldierEvent.OnClientEvent:Connect(OnClearSoldier)
 UpdateCollectPadEvent.OnClientEvent:Connect(OnUpdateCollectPad)
 
--- Fires particle burst and plays cash sound when a lane's collect pad is stepped on.
+-- Fires button tween, white flash, particle burst, and cash sound when a collect pad is stepped on.
 CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)
     if not LocalPlayerPlot then return end
     local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
@@ -212,9 +213,29 @@ CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)
     local PadModel = CashCollectors:FindFirstChild("CollectCash" .. LaneNum)
     if not PadModel then return end
 
-    -- Burst the particle emitter on the 0.5-stud part
     for _, Child in ipairs(PadModel:GetChildren()) do
-        if Child:IsA("BasePart") and Child.Size.X == 0.5 then
+        if not Child:IsA("BasePart") then continue end
+
+        -- Button face (thin 0.2-stud part): tween down then spring back + flash white
+        if Child.Size.X < 0.3 then
+            local OrigCFrame = Child.CFrame
+            local PressIn = TweenService:Create(Child, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                CFrame = OrigCFrame * CFrame.new(0, -0.05, 0),
+                Color = Color3.new(1, 1, 1),
+                Transparency = 0,
+            })
+            local PressOut = TweenService:Create(Child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                CFrame = OrigCFrame,
+                Transparency = 1,
+            })
+            PressIn:Play()
+            PressIn.Completed:Connect(function()
+                PressOut:Play()
+            end)
+        end
+
+        -- Particle burst on the 0.5-stud emitter part
+        if Child.Size.X > 0.4 and Child.Size.X < 0.6 then
             local Emitter = Child:FindFirstChildOfClass("ParticleEmitter")
             if Emitter then
                 local OrigSpeed = Emitter.Speed
@@ -222,7 +243,6 @@ CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)
 
                 Emitter.Speed = NumberRange.new(3, 5)
                 Emitter.Lifetime = NumberRange.new(0.4, 0.7)
-
                 Emitter:Emit(25)
 
                 task.delay(0.05, function()

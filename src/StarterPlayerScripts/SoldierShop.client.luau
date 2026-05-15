@@ -28,18 +28,7 @@ local LogInfo = TweenInfo.new(.1, Enum.EasingStyle.Quad, Enum.EasingDirection.In
 local LogExitInfo = TweenInfo.new(.7, Enum.EasingStyle.Quad, Enum.EasingDirection.InOut)
 
 -- Applies a soldier's shop color and gradient to a ViewTile
-local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
-    local Data = SETTINGS.SOLDIER_DATA[SoldierType]
-    ViewTile.BackgroundColor3 = Data["ShopColor"]
-
-    local Gradient = ViewTile:FindFirstChildOfClass("UIGradient")
-    if not Gradient then
-        Gradient = Instance.new("UIGradient")
-        Gradient.Parent = ViewTile
-    end
-    Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
-    Gradient.Rotation = 90
-end
+local ApplyViewTileStyle = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("ViewTile"))
 
 local LocalPlayer = Players.LocalPlayer
 local UI = LocalPlayer:WaitForChild("PlayerScripts"):WaitForChild("Client"):WaitForChild("UI")

@@ -554,15 +554,15 @@ CommanderPassEvent.OnClientEvent:Connect(function(Action: string)
     end
 end)
 
-LoadPlayerEvent.OnClientEvent:Connect(function(_: table, EntryName: string?)
+LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table, EntryName: string?)
+    -- Close purchase frames whose flow just completed
     if EntryName == "StarterPack" and StarterPackFrame.Visible then
         CloseStarterPackFrame(false)
     elseif EntryName == "CommanderPass" and CommanderPassFrame.Visible then
         CloseCommanderPassFrame(false)
     end
-end)
 
-LoadPlayerEvent.OnClientEvent:Connect(function(PlayerData: table)
+    -- Show/hide commander pass HUD button based on ownership
     local OwnsCommanderPass = false
     if PlayerData.Plot and PlayerData.Plot.Unlocks then
         OwnsCommanderPass = PlayerData.Plot.Unlocks.Slot8 == true

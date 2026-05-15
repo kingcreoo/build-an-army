@@ -69,18 +69,7 @@ end
 local RATING_ORDER_REVERSED = CreateReversedTable(SETTINGS.RATING_ORDER)
 
 -- Applies a soldier's shop color and gradient to a ViewTile
-local function ApplyViewTileStyle(ViewTile: Frame, SoldierType: string)
-	local Data = SETTINGS.SOLDIER_DATA[SoldierType]
-	ViewTile.BackgroundColor3 = Data["ShopColor"]
-
-	local Gradient = ViewTile:FindFirstChildOfClass("UIGradient")
-	if not Gradient then
-		Gradient = Instance.new("UIGradient")
-		Gradient.Parent = ViewTile
-	end
-	Gradient.Color = ColorSequence.new(Data["ShopGradient1"], Data["ShopGradient2"])
-	Gradient.Rotation = 90
-end
+local ApplyViewTileStyle = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("ViewTile"))
 
 -- Checks if a soldier is currently active
 local function IsSoldierActive(ActiveSoldiers, SoldierID)

@@ -233,18 +233,6 @@ local function CreateSoldier(Type: string)
     return SoldierID, SoldierData
 end
 
-local function InjectSoldier(Player: Player, Type: string)
-    local PlayerData = Data.Get(Player)
-
-    local SoldierID = HttpService:GenerateGUID()
-    local SoldierData = {["Model"] = ResolveSoldierModel(Type), ["Type"] = Type}
-
-    PlayerData["Inventory"]["SoldierInventory"][SoldierID] = SoldierData
-    Data.Set(Player, PlayerData)
-
-    PlayerPlotManagers[Player.Name]:SetSoldier("Slot" .. #PlayerData["Inventory"]["ActiveSoldiers"] + 1, SoldierID)
-end
-
 local function InjectTarget(Player: Player, TargetType: string)
 	local PlayerData = Data.Get(Player)
 
