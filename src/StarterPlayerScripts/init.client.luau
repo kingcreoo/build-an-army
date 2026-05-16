@@ -22,6 +22,7 @@ local ClearSoldierEvent = Remotes:WaitForChild("ClearSoldier")
 local UpdateCollectPadEvent: RemoteEvent = Remotes:WaitForChild("UpdateCollectPad")
 local CollectCashEvent: RemoteEvent = Remotes:WaitForChild("CollectCash")
 local PlotAssignmentEvent: RemoteEvent = Remotes:WaitForChild("PlotAssignment")
+local UpdateBoostsEvent: RemoteEvent = Remotes:WaitForChild("UpdateBoosts")
 
 local SOUND_MANAGER = require(ReplicatedStorage:WaitForChild("Settings"):WaitForChild("SoundManager"))
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
@@ -33,6 +34,10 @@ local LocalPlayerPlot = nil
 -- { [LaneNum] = SoldierData } and ActiveTarget string
 local LocalActiveSoldiers = {}
 local LocalActiveTarget = nil
+
+-- Mirrors the active boost state sent by the server. Used to compute boosted DPS client-side.
+-- [BoostType] = { Amount, ExpiresAt } — same shape as UpdateBoosts payload.
+local LocalActiveBoosts = {}
 
 -- Returns the local player's Plot folder. Prefers the cached name from PlotAssignmentEvent,
 -- but scans the Owner attribute if the event was missed (e.g. require() blocked the handler).
@@ -81,14 +86,21 @@ end)
 -- // Functions
 
 -- Calculates cash-per-second for a soldier type against the current active target.
-local function CalculateLaneDPS(SoldierType: string, TargetType: string): number
+-- Multipliers table is optional: pass nil for base (unboosted) DPS.
+-- Mirrors the server's RewardLoop math exactly so the display matches actual earnings.
+local function CalculateLaneDPS(SoldierType: string, TargetType: string, Multipliers: table?): number
     local SoldierStats = SETTINGS.SOLDIER_DATA[SoldierType]
     local TargetData = SETTINGS.TARGET_DATA[TargetType]
     if not SoldierStats or not TargetData then return 0 end
 
     local WeaponInfo = SoldierStats.WeaponInfo
     local WeaponType = SoldierStats.WeaponType
-    local Damage = WeaponInfo.Damage
+
+    -- Pull multipliers (default 1 = no boost)
+    local DamageMulti   = Multipliers and (Multipliers["DamageMultiplier"]   or 1) or 1
+    local FireRateMulti = Multipliers and (Multipliers["FireRateMultiplier"] or 1) or 1
+    local TargetMulti   = Multipliers and (Multipliers["TargetMultiplier"]   or 1) or 1
+    local CashMulti     = Multipliers and (Multipliers["CashMultiplier"]     or 1) or 1
 
     -- Bullets per trigger pull (mirrors RewardLoop/IdleRewards logic)
     local BulletsPerShot = 1
@@ -98,16 +110,84 @@ local function CalculateLaneDPS(SoldierType: string, TargetType: string): number
         BulletsPerShot = 2
     end
 
-    local EffectiveDamage = Damage * BulletsPerShot
+    -- DamageMultiplier increases damage per bullet → fewer shots to kill
+    local EffectiveDamage = WeaponInfo.Damage * DamageMulti * BulletsPerShot
     local ShotsToKill = math.ceil(TargetData.TotalHealth / EffectiveDamage)
-    local KillTime = (ShotsToKill - 1) * WeaponInfo.FireRate
-    local TravelTime = SETTINGS.DISTANCES.Worlds.Default / WeaponInfo.BulletSpeed
-    local CycleTime = KillTime + TravelTime + TargetData.TotalRespawnTime
 
-    return TargetData.Reward / CycleTime
+    -- FireRateMultiplier divides fire interval → faster shots
+    local EffectiveFireRate = WeaponInfo.FireRate / FireRateMulti
+    local KillTime = (ShotsToKill - 1) * EffectiveFireRate
+
+    local TravelTime = SETTINGS.DISTANCES.Worlds.Default / WeaponInfo.BulletSpeed
+
+    -- TargetMultiplier divides respawn time → faster cycle
+    local EffectiveRespawn = TargetData.TotalRespawnTime / TargetMulti
+    local CycleTime = KillTime + TravelTime + EffectiveRespawn
+
+    -- TargetMultiplier and CashMultiplier both multiply reward per kill
+    local EffectiveReward = TargetData.Reward * TargetMulti * CashMulti
+
+    return EffectiveReward / CycleTime
 end
 
--- Updates the CashPerSecondGui on a single lane's collect pad.
+-- Returns a flat multipliers table from LocalActiveBoosts (Amount per type, expired entries = 1).
+-- Used to pass into CalculateLaneDPS for the boosted display.
+local function GetCurrentMultipliers(): table
+    local Now = os.time()
+    local M = {}
+    for _, BoostType in ipairs(SETTINGS.BOOST_TYPES) do
+        local Entry = LocalActiveBoosts[BoostType]
+        M[BoostType] = (Entry and Entry.ExpiresAt > Now) and Entry.Amount or 1
+    end
+    return M
+end
+
+-- Returns true if any boost multiplier is currently above 1.
+local function AnyBoostActive(): boolean
+    local Now = os.time()
+    for _, Entry in pairs(LocalActiveBoosts) do
+        if Entry.ExpiresAt > Now then return true end
+    end
+    return false
+end
+
+-- Finds or creates the BaseDPS label inside a CashPerSecondGui BillboardGui.
+-- The existing Studio TextLabel is renamed "BoostedDPS" on first access and pinned to the right half.
+-- A new "BaseDPS" label is cloned from it, darkened, and pinned to the left half.
+-- Both labels fill the full billboard height; each takes half the width side by side.
+local function GetOrCreateDPSLabels(DPSGui: BillboardGui): (TextLabel?, TextLabel?)
+    local BoostedLabel = DPSGui:FindFirstChild("BoostedDPS")
+    local BaseLabel    = DPSGui:FindFirstChild("BaseDPS")
+
+    if not BoostedLabel then
+        -- First time: rename the existing label and reposition it to the right half
+        local Existing = DPSGui:FindFirstChildOfClass("TextLabel")
+        if not Existing then return nil, nil end
+        Existing.Name = "BoostedDPS"
+        Existing.Size = UDim2.fromScale(0.5, 1)
+        Existing.Position = UDim2.fromScale(0.5, 0)
+        Existing.AnchorPoint = Vector2.new(0, 0)
+        BoostedLabel = Existing
+    end
+
+    if not BaseLabel then
+        -- Clone the boosted label, pin it to the left half, and darken it
+        BaseLabel = BoostedLabel:Clone()
+        BaseLabel.Name = "BaseDPS"
+        BaseLabel.Size = UDim2.fromScale(0.5, 1)
+        BaseLabel.Position = UDim2.fromScale(0, 0)
+        BaseLabel.AnchorPoint = Vector2.new(0, 0)
+        BaseLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
+        BaseLabel.Visible = false
+        BaseLabel.Parent = DPSGui
+    end
+
+    return BoostedLabel, BaseLabel
+end
+
+-- Updates both DPS labels on a single lane's collect pad.
+-- BoostedDPS shows the current effective DPS (with all active boosts applied).
+-- BaseDPS shows the raw unboosted DPS and is only visible when a boost is active.
 local function RefreshLaneDPS(LaneNum: number)
     local Plot = ResolveLocalPlot()
     if not Plot then
@@ -129,19 +209,43 @@ local function RefreshLaneDPS(LaneNum: number)
     if not GuiParts then return end
     local DPSGui = GuiParts:FindFirstChild("CashPerSecondGui")
     if not DPSGui then return end
-    local Label = DPSGui:FindFirstChildOfClass("TextLabel")
-    if not Label then return end
+
+    local BoostedLabel, BaseLabel = GetOrCreateDPSLabels(DPSGui)
+    if not BoostedLabel then return end
 
     DPSGui.Enabled = true
 
     local SoldierData = LocalActiveSoldiers[LaneNum]
     if not SoldierData or not LocalActiveTarget then
-        Label.Text = "$0/s"
+        BoostedLabel.Text = "$0/s"
+        if BaseLabel then BaseLabel.Visible = false end
         return
     end
 
-    local DPS = CalculateLaneDPS(SoldierData.Type, LocalActiveTarget)
-    Label.Text = "$" .. string.format("%.1f", DPS) .. "/s"
+    local BoostActive = AnyBoostActive()
+    local Multipliers = GetCurrentMultipliers()
+
+    -- Boosted label always shows the effective (boosted) DPS
+    local BoostedDPS = CalculateLaneDPS(SoldierData.Type, LocalActiveTarget, Multipliers)
+    BoostedLabel.Text = "$" .. string.format("%.1f", BoostedDPS) .. "/s"
+
+    -- Base label shows unboosted DPS, only visible when a boost is actually active.
+    -- When hidden, restore BoostedLabel to full width so it recenters.
+    if BaseLabel then
+        if BoostActive then
+            local BaseDPS = CalculateLaneDPS(SoldierData.Type, LocalActiveTarget, nil)
+            BaseLabel.Text = "$" .. string.format("%.1f", BaseDPS) .. "/s"
+            BaseLabel.Visible = true
+            -- BoostedLabel occupies right half when base is visible
+            BoostedLabel.Size = UDim2.fromScale(0.5, 1)
+            BoostedLabel.Position = UDim2.fromScale(0.5, 0)
+        else
+            BaseLabel.Visible = false
+            -- BoostedLabel recenters to full width when no boost is active
+            BoostedLabel.Size = UDim2.fromScale(1, 1)
+            BoostedLabel.Position = UDim2.fromScale(0, 0)
+        end
+    end
 end
 
 local function OnSetSoldier(Player: Player, SlotNumber: string, SoldierID: string, SoldierData: table)
@@ -219,6 +323,14 @@ SetSoldierEvent.OnClientEvent:Connect(OnSetSoldier)
 SetTargetEvent.OnClientEvent:Connect(OnSetTarget)
 ClearSoldierEvent.OnClientEvent:Connect(OnClearSoldier)
 UpdateCollectPadEvent.OnClientEvent:Connect(OnUpdateCollectPad)
+
+-- When boost state changes, update LocalActiveBoosts and refresh all active lane DPS displays
+UpdateBoostsEvent.OnClientEvent:Connect(function(BoostState: table)
+    LocalActiveBoosts = BoostState or {}
+    for LaneNum in pairs(LocalActiveSoldiers) do
+        RefreshLaneDPS(LaneNum)
+    end
+end)
 
 -- Fires button tween, white flash, particle burst, and cash sound when a collect pad is stepped on.
 CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)

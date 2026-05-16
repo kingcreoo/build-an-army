@@ -17,7 +17,7 @@ local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 
 -- // Variables
-local DataStore = DataStoreService:GetDataStore("PlayerData_v4")
+local DataStore = DataStoreService:GetDataStore("PlayerData_v5")
 
 local CURRENT_DATA_VERSION = 1
 local LOAD_ATTEMPTS = 3

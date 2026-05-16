@@ -14,6 +14,7 @@ local Plot = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Pl
 local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 local IdleRewards = require(ServerScriptService:WaitForChild("Server"):WaitForChild("IdleRewards"))
+local BoostManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("BoostManager"))
 local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
 local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
 
@@ -453,10 +454,13 @@ local function OnPlayerAdded(Player: Player)
         print(Player.Name .. " is a new player. Skipping tutorial.")
     end
 
-    -- 1b) Init player in the rewardloop
+    -- 1b) Purge expired boosts, initialize multiplier cache, start boost tree timers
+    BoostManager.SetupPlayer(Player, PlayerData)
+
+    -- 1c) Init player in the rewardloop
     RewardLoop.SetupPlayer(Player, PlayerData)
 
-    -- 1c) Load player's idle rewards
+    -- 1d) Load player's idle rewards
     if PlayerData["LogOff"] then
         IdleRewards.OnPlayerAdded(Player, PlayerData)
     end
@@ -515,7 +519,10 @@ local function OnPlayerRemoving(Player: Player)
     -- 0) Claim idle rewards if player never did
     IdleRewards.ClaimRewards(Player)
 
-    -- 0a) Persist playtime for this session before saving/removing data
+    -- 0a) Clear boost manager in-memory state (cache, timers)
+    BoostManager.CleanupPlayer(Player.Name)
+
+    -- 0b) Persist playtime for this session before saving/removing data
     local PlayerData = Data.Get(Player)
     local SessionStart = SessionStartTimes[Player.Name]
     if PlayerData and SessionStart then
@@ -766,6 +773,12 @@ UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
 	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
 end)
 
+local ClaimBoostTreeEvent: RemoteEvent = EnsureRemoteEvent("ClaimBoostTree")
+ClaimBoostTreeEvent.OnServerEvent:Connect(function(Player: Player, SlotNumber: any)
+    -- 1 claim per 3s — claims are deliberate one-at-a-time actions
+    if not RateLimit.Check(Player, "ClaimBoostTree", 1, 3) then return end
+    BoostManager.ClaimBoostTreeSlot(Player, SlotNumber)
+end)
 
 -- Returns the player's assigned plot name. Used by client scripts that miss
 -- the PlotAssignmentEvent on join due to load order.

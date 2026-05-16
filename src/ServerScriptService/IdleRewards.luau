@@ -13,7 +13,7 @@ local Players = game:GetService("Players")
 local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local Data = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Data"))
 local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
-local TransactionManager = require(ServerScriptService:WaitForChild("TransactionManager"))
+local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
 
 -- // Variables
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
@@ -21,6 +21,15 @@ local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
 local UpdateCollectPadEvent: RemoteEvent = Remotes:WaitForChild("UpdateCollectPad")
 
 local Rewards = {}
+
+-- BoostManager is resolved lazily to avoid a circular require at load time.
+local BoostMgr
+local function GetBoostMgr()
+    if not BoostMgr then
+        BoostMgr = require(ServerScriptService:WaitForChild("Server"):WaitForChild("BoostManager"))
+    end
+    return BoostMgr
+end
 
 -- // Local Functions
 
@@ -40,7 +49,7 @@ local function GetBulletsPerShot(SoldierStats: table): number
     return 1
 end
 
-local function CalculateRewards(PlayerData: table, TimeAway: number)
+local function CalculateRewards(PlayerData: table, TimeAway: number, PlayerName: string)
     local TotalPossibleRewards = 0
 
     -- Get player's active setup
@@ -56,6 +65,13 @@ local function CalculateRewards(PlayerData: table, TimeAway: number)
 
     -- Get distance
     local Distance = Settings["DISTANCES"]["Worlds"]["Default"]
+
+    -- Fetch boost multipliers once for the whole calculation (same boosts apply to all soldiers)
+    local TargetMulti = GetBoostMgr().GetCachedMultiplier(PlayerName, "TargetMultiplier")
+
+    -- TargetMultiplier speeds up respawn and increases reward per kill (mirrors live combat)
+    local EffectiveRespawn = TargetRespawnTime / TargetMulti
+    local EffectiveReward  = TargetReward * TargetMulti
 
     for _, SoldierID in pairs(ActiveSoldiers) do
         local SoldierData = SoldierInventory[SoldierID]
@@ -80,11 +96,11 @@ local function CalculateRewards(PlayerData: table, TimeAway: number)
             -- Calculate travel time for last bullet
             local TravelTime = Distance / WeaponInfo["BulletSpeed"]
 
-            -- Calculate total kill cycle time
-            local CycleTime = LastShotTime + TravelTime + TargetRespawnTime
+            -- Calculate total kill cycle time (using boost-adjusted respawn)
+            local CycleTime = LastShotTime + TravelTime + EffectiveRespawn
 
             -- Calculate rewards per second for this soldier, then multiply by time away
-            local SoldierRPS = TargetReward / CycleTime
+            local SoldierRPS = EffectiveReward / CycleTime
             local SoldierTotal = SoldierRPS * TimeAway
 
             -- Add total soldier rewards to the running total
@@ -92,7 +108,9 @@ local function CalculateRewards(PlayerData: table, TimeAway: number)
         end
     end
 
-    return math.floor(TotalPossibleRewards)
+    -- Apply CashMultiplier to the total (same as live combat reward path)
+    local CashMulti = GetBoostMgr().GetCachedMultiplier(PlayerName, "CashMultiplier")
+    return math.floor(TotalPossibleRewards * CashMulti)
 end
 
 -- // Module Functions
@@ -122,7 +140,7 @@ function IdleRewards.OnPlayerAdded(Player: Player, PlayerData: table)
             local MaxTime = HasVIP and Settings.IDLE_CONFIG.CommanderCap or Settings.IDLE_CONFIG.FreeCap
             ClampedTimeAway = math.min(RawTimeAway, MaxTime)
             local RateMultiplier = HasVIP and Settings.IDLE_CONFIG.CommanderRate or Settings.IDLE_CONFIG.FreeRate
-            IdleEarnings = math.floor(CalculateRewards(PlayerData, ClampedTimeAway) * RateMultiplier)
+            IdleEarnings = math.floor(CalculateRewards(PlayerData, ClampedTimeAway, Player.Name) * RateMultiplier)
         end
     end
 

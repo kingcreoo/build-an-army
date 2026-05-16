@@ -444,8 +444,9 @@ local function SpawnHitmarkers(TargetModel: Model, SoldierModel: Model, SoldierT
 
     if WeaponType == "Shotgun" and WeaponInfo["Pellets"] then
         local Pellets = WeaponInfo["Pellets"]
-        local Base = math.floor(Damage / Pellets)
-        local Remainder = Damage % Pellets
+        local DamageInt = math.floor(Damage)
+        local Base = math.floor(DamageInt / Pellets)
+        local Remainder = DamageInt % Pellets
 
         -- Build the list of pellets that will actually spawn
         local PelletDamages = {}
@@ -466,7 +467,7 @@ local function SpawnHitmarkers(TargetModel: Model, SoldierModel: Model, SoldierT
             SpawnMarker(BasePos, "-" .. tostring(PelletDamage), DAMAGE_COLOR, Angle)
         end
     else
-        SpawnMarker(BasePos, "-" .. tostring(Damage), DAMAGE_COLOR)
+        SpawnMarker(BasePos, "-" .. tostring(math.floor(Damage)), DAMAGE_COLOR)
     end
 end
 
@@ -492,7 +493,8 @@ local function AnimateSoldiers(SoldiersToAnimate: table)
         end
 
         -- 5) Health bar logic (only for non-null bullets)
-        local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]["Damage"]
+        -- DamageMulti is stored inside SoldierData so it survives PlotVisualizer's table reconstruction
+        local Damage = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]["Damage"] * (InfoTable.SoldierData.DamageMulti or 1)
 
         -- Guard against FireSoldier arriving before SetTarget populates the local tracking table
         local SlotData = Targets[InfoTable.PlayerName] and Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]

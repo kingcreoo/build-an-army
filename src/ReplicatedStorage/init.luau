@@ -48,12 +48,20 @@ SETTINGS.DEFAULT_DATA = {
     -- Rebirth scaffolding. Filled in when the rebirth system lands.
     ["Rebirths"] = 0,
     ["RebirthTokens"] = 0,
-    -- Boost scaffolding. Active = timed boosts with ExpiresAt; Permanent = non-expiring.
-    -- Shape per entry: { Type = "CashMultiplier" | "DamageMultiplier" | "FireRateMultiplier",
-    --                    Amount = number, Source = string, ExpiresAt = number? }
+    -- Active timed boosts, keyed by boost type. At most one entry per type (merge math enforces this).
+    -- Entry shape: { Amount = number, ExpiresAt = number (os.time), Source = string }
+    -- Permanent boosts from rebirths, keyed by boost type. Value = multiplier amount (e.g. 1.5).
     ["Boosts"] = {
         ["Active"] = {},
         ["Permanent"] = {}
+    },
+    -- Boost tree ready-to-claim state. PendingBoost = false when generating; table when ready.
+    -- PendingBoost shape: { Type = string, Amount = number, Duration = number }
+    -- Generation timers are session-only (in-memory in BoostManager); only PendingBoost persists.
+    ["BoostTree"] = {
+        ["Slot1"] = { ["PendingBoost"] = false },
+        ["Slot2"] = { ["PendingBoost"] = false },
+        ["Slot3"] = { ["PendingBoost"] = false },
     }
 }
 
@@ -609,6 +617,19 @@ SETTINGS.IDLE_CONFIG = {
 -- Stock rotation configuration
 SETTINGS.STOCK_CONFIG = {
     ["RotationSeconds"] = 720  -- 12 minutes between shop refreshes
+}
+
+-- All valid boost type identifiers. Used for validation, cache building, and random tree generation.
+SETTINGS.BOOST_TYPES = {
+    "CashMultiplier", "DamageMultiplier", "FireRateMultiplier", "TargetMultiplier"
+}
+
+-- Boost tree slot config. Slot1 is always unlocked; Slot2/3 require rebirths.
+-- GenerationSeconds and BoostDuration are tuning targets (not final economy values).
+SETTINGS.BOOST_TREE = {
+    ["Slot1"] = { ["RebirthRequired"] = 0, ["BoostAmount"] = 1.5, ["GenerationSeconds"] = 480, ["BoostDuration"] = 120  },
+    ["Slot2"] = { ["RebirthRequired"] = 1, ["BoostAmount"] = 2.0, ["GenerationSeconds"] = 360, ["BoostDuration"] = 150  },
+    ["Slot3"] = { ["RebirthRequired"] = 2, ["BoostAmount"] = 2.5, ["GenerationSeconds"] = 300, ["BoostDuration"] = 180  },
 }
 
 -- Cash pack Robux products (credit amounts granted per pack)

@@ -32,6 +32,16 @@ local PlayerPlotNames = {} -- Player.Name -> "Plot1".."Plot6"
 
 local UpdateCollectPadEvent -- resolved lazily to avoid circular require timing issues
 
+-- BoostManager is resolved lazily to avoid a circular require at load time.
+-- Require chain without lazy: Data -> RewardLoop -> BoostManager -> Data (cycle).
+local BoostMgr
+local function GetBoostMgr()
+    if not BoostMgr then
+        BoostMgr = require(script.Parent.BoostManager)
+    end
+    return BoostMgr
+end
+
 -- Returns the workspace plot folder for a given player, or nil if not assigned yet.
 local function GetPlotForPlayer(PlayerName: string)
     local PlotName = PlayerPlotNames[PlayerName]
@@ -94,7 +104,10 @@ local function AddReward(InfoTable: table)
 
     -- 2) Calculate and add reward to this lane's pending cash bucket
     local TargetType = Targets[PlayerName][Slot].Type
-    local RewardAmount = SETTINGS["TARGET_DATA"][TargetType]["Reward"]
+    local BaseReward   = SETTINGS["TARGET_DATA"][TargetType]["Reward"]
+    local CashMulti    = GetBoostMgr().GetCachedMultiplier(PlayerName, "CashMultiplier")
+    local TargetMulti  = GetBoostMgr().GetCachedMultiplier(PlayerName, "TargetMultiplier")
+    local RewardAmount = math.floor(BaseReward * CashMulti * TargetMulti)
     local LaneNum = tonumber(string.sub(Slot, 5))
     if LaneNum then
         PendingCash[PlayerName][LaneNum] = (PendingCash[PlayerName][LaneNum] or 0) + RewardAmount
@@ -105,8 +118,9 @@ local function AddReward(InfoTable: table)
         end
     end
 
-    -- 3) Schedule respawn
-    local RespawnTime = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"]
+    -- 3) Schedule respawn (TargetMultiplier speeds up respawn — higher multiplier = faster cycle)
+    local BaseRespawn = SETTINGS["TARGET_DATA"][TargetType]["TotalRespawnTime"]
+    local RespawnTime = BaseRespawn / GetBoostMgr().GetCachedMultiplier(PlayerName, "TargetMultiplier")
     task.delay(RespawnTime, function()
         if not Targets[PlayerName] or not Targets[PlayerName][Slot] then
             return
@@ -118,7 +132,7 @@ end
 
 -- Applies damage and handles death/reward logic for a single bullet
 local function ApplyBulletDamage(InfoTable: table, WeaponInfo: table)
-	local Damage = WeaponInfo["Damage"]
+	local Damage = WeaponInfo["Damage"] * (InfoTable.DamageMulti or 1)
 	local CurrentHealth = Targets[InfoTable.PlayerName][InfoTable.SoldierData.Slot]["Health"]
 
 	-- Set damage
@@ -140,6 +154,11 @@ end
 
 local function FireSoldiers(SoldiersToFire)
 	for _, InfoTable in pairs(SoldiersToFire) do
+		-- Pre-fetch damage multiplier once per soldier (cheaper than re-fetching per bullet in burst/dual)
+		-- Stored inside SoldierData so it survives the client's InfoTable reconstruction in PlotVisualizer
+		InfoTable.SoldierData.DamageMulti = GetBoostMgr().GetCachedMultiplier(InfoTable.PlayerName, "DamageMultiplier")
+		InfoTable.DamageMulti = InfoTable.SoldierData.DamageMulti
+
 		local WeaponType = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponType"]
 		local WeaponInfo = SETTINGS["SOLDIER_DATA"][InfoTable.SoldierData.Type]["WeaponInfo"]
 
@@ -372,9 +391,8 @@ function RewardLoop.Init()
                 if not SoldierStats then continue end
                 local BaseFireRate = SoldierStats["WeaponInfo"]["FireRate"]
 
-                -- 2) Get any boosts
-                -- TODO get boosts
-                local AbsoluteFireRate = BaseFireRate -- + BOOSTS
+                -- 2) Apply FireRateMultiplier (divides fire interval — higher multiplier = faster fire)
+                local AbsoluteFireRate = BaseFireRate / GetBoostMgr().GetCachedMultiplier(PlayerName, "FireRateMultiplier")
 
                 -- 3) Check if this soldier has a timer entry, if not create one
                 if not Timers[PlayerName][SoldierID] then
