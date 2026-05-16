@@ -28,6 +28,9 @@ local CreditsButton: TextButton = HUD:WaitForChild("CreditsButton")
 local CreditsText: TextLabel = HUD:WaitForChild("CreditsText")
 local StoreContainer: GuiObject = HUD:WaitForChild("Store")
 local CommanderPassHUD: GuiObject = HUD:WaitForChild("CommanderPass")
+local TeleportsDisplay: GuiObject = HUD:WaitForChild("TeleportsDisplay")
+local TeleportHomeButton: TextButton = TeleportsDisplay:WaitForChild("Home"):WaitForChild("Button")
+local TeleportShopButton: TextButton = TeleportsDisplay:WaitForChild("Shop"):WaitForChild("Button")
 local StoreButton: GuiButton = GetClickableButton(StoreContainer)
 local CommanderPassHUDButton: GuiButton = GetClickableButton(CommanderPassHUD)
 
@@ -55,7 +58,7 @@ local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = f
 
 local HUDButtons = {SoldiersButton}
 local HUDButtonsPulse = {StoreContainer, SettingsButton, CreditsButton, CommanderPassHUD}
-local HUDElements = {SoldiersButton, SettingsButton, CommanderPassHUD, StoreContainer, CreditsButton, CreditsText}
+local HUDElements = {SoldiersButton, SettingsButton, CommanderPassHUD, StoreContainer, CreditsButton, CreditsText, TeleportsDisplay}
 
 for _, Element in ipairs(HUDElements) do
     if Element:IsA("GuiObject") and not Element:GetAttribute("OriginSize") then
@@ -97,6 +100,7 @@ local ActiveFrame = nil
 local ActiveFramePriority = nil
 local HUDActive = nil
 local CommanderPassHidden = false
+local LocalPlayerPlot = nil
 
 local SBD = false
 local StarterPackOpenDebounce = false
@@ -146,7 +150,6 @@ local function CloseHUD(Fast: boolean)
         end
     else
         for _, Button in pairs(HUDElements) do
-            task.wait(.05)
             ButtonClose(Button)
         end
     end
@@ -171,7 +174,6 @@ local function OpenHUD(Fast)
                 Button.Visible = false
             else
                 ButtonOpen(Button)
-                task.wait(.2)
             end
         end
         HUDActive = true
@@ -600,6 +602,7 @@ local RING_NAME_TO_UI = {
 
 PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
     if PlayerName ~= LocalPlayer.Name then return end
+    LocalPlayerPlot = PlotName
 
     task.spawn(function()
         local Plot = workspace:WaitForChild("Plots"):WaitForChild(PlotName, 10)
@@ -645,6 +648,80 @@ OpenUIEvent.OnClientEvent:Connect(function(UIName: string)
     end
 end)
 
+-- Resolves the local player's plot folder. Prefers the cached name from the
+-- PlotAssignment event, but falls back to scanning the Owner attribute the
+-- server stamps on the folder, so this works even if the event was missed.
+local function ResolveLocalPlot(): Instance?
+    local Plots = workspace:FindFirstChild("Plots")
+    if not Plots then return nil end
+
+    if LocalPlayerPlot then
+        local Cached = Plots:FindFirstChild(LocalPlayerPlot)
+        if Cached then return Cached end
+    end
+
+    for _, Plot in ipairs(Plots:GetChildren()) do
+        if Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            LocalPlayerPlot = Plot.Name
+            return Plot
+        end
+    end
+    return nil
+end
+
+-- Pivots the full character model to the given world position.
+local function TeleportTo(Position: Vector3)
+    local Character = LocalPlayer.Character
+    if not Character then
+        Notify("No character!", 1, Color3.fromRGB(255, 0, 0))
+        return
+    end
+    Character:PivotTo(CFrame.new(Position))
+end
+
+TeleportHomeButton.MouseButton1Click:Connect(function()
+    local Plot = ResolveLocalPlot()
+    if not Plot then
+        Notify("Plot not assigned yet", 1, Color3.fromRGB(255, 100, 0))
+        return
+    end
+    local SpawnsFolder = Plot:FindFirstChild("Spawns")
+    local Spawn4 = SpawnsFolder and SpawnsFolder:FindFirstChild("SoldierSpawn4")
+    local Spawn5 = SpawnsFolder and SpawnsFolder:FindFirstChild("SoldierSpawn5")
+    local ShopBase = Plot:FindFirstChild("ShopAreaBase")
+    local RangeBase = Plot:FindFirstChild("RangeAreaBase")
+    if not (Spawn4 and Spawn5 and ShopBase and RangeBase) then
+        Notify("Missing spawn parts", 1, Color3.fromRGB(255, 0, 0))
+        return
+    end
+
+    -- Average of the two spawn positions, then push 10 studs toward the shop
+    local MidPos = (Spawn4.Position + Spawn5.Position) / 2
+    local TowardShop = (ShopBase.Position - RangeBase.Position).Unit
+    TeleportTo(Vector3.new(MidPos.X, MidPos.Y + 5, MidPos.Z) + TowardShop * 10)
+end)
+
+TeleportShopButton.MouseButton1Click:Connect(function()
+    local Plot = ResolveLocalPlot()
+    if not Plot then
+        Notify("Plot not assigned yet", 1, Color3.fromRGB(255, 100, 0))
+        return
+    end
+    local Rings = Plot:FindFirstChild("InteractionRings")
+    local ShopRing = Rings and Rings:FindFirstChild("SoldierShopRing")
+    local ShopBase = Plot:FindFirstChild("ShopAreaBase")
+    if not (ShopRing and ShopBase) then
+        Notify("Missing shop ring/base", 1, Color3.fromRGB(255, 0, 0))
+        return
+    end
+
+    -- Start at the ring pivot, push 6 studs toward the shop floor center
+    local RingPos = ShopRing:GetPivot().Position
+    local TowardShop = (ShopBase.Position - RingPos)
+    TowardShop = Vector3.new(TowardShop.X, 0, TowardShop.Z).Unit
+    TeleportTo(RingPos + TowardShop * 6 + Vector3.new(0, 5, 0))
+end)
+
 NotifyBindable.Event:Connect(Notify)
 
 IdleRewardsEvent.OnClientEvent:Connect(ShowIdleRewards)
@@ -659,6 +736,7 @@ end)
 
 StarterPackFrame.Visible = false
 CommanderPassFrame.Visible = false
+HUD:WaitForChild("BoostsDisplay").Visible = false
 
 -- Animation stuff
 

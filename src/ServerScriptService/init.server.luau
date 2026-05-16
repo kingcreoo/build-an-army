@@ -27,10 +27,6 @@ local CurrentStock
 local TimeOfStock
 local RecentPurchases = {}
 local SessionStartTimes = {}
-local StarterPackOpenStates = {}
-local StarterPackTouchCooldowns = {}
-local CommanderPassOpenStates = {}
-local CommanderPassTouchCooldowns = {}
 
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 
@@ -119,51 +115,6 @@ local function RemoveStarterPackPart(Player: Player)
     end
 end
 
-local function RemoveCommanderPassPart(Player: Player)
-    local PlotManager = PlayerPlotManagers[Player.Name]
-    if not PlotManager or not PlotManager.Plot then
-        return
-    end
-
-    local CommanderPassPart = PlotManager.Plot:FindFirstChild("CommanderPass")
-    if CommanderPassPart then
-        CommanderPassPart:Destroy()
-    end
-end
-
--- Returns true when the player should still see the starter pack offer
-local function CanShowStarterPack(Player: Player, PlayerData: table): boolean
-    if not PlayerData then
-        return false
-    end
-
-    if PlayerData.Offers and PlayerData.Offers.StarterPackPurchased then
-        return false
-    end
-
-    return GetCurrentPlayTime(Player, PlayerData) < SETTINGS.STARTER_PACK.OfferSeconds
-end
-
-local function CanShowCommanderPass(Player: Player): boolean
-    return not TransactionManager.IsPassOwned(Player, "CommanderPass")
-end
-
--- STUB: Starter pack used to live as a touchable part on the old plot template.
--- New map uses StarterPackRing in InteractionRings; this whole flow needs a rewrite.
--- Disabled for today's redux pass so the server doesn't error referencing nonexistent parts.
-local function SetupStarterPack(Player: Player)
-    -- TODO: Rewire to StarterPackRing ProximityPrompt + ring on/off toggling
-    return
-end
-
-
-
--- STUB: Same situation as SetupStarterPack — old "CommanderPass" part is gone.
--- New map uses CommanderPassRing; this needs a rewrite that's out of scope for today.
-local function SetupCommanderPass(Player: Player)
-    -- TODO: Rewire to CommanderPassRing ProximityPrompt + ownership check
-    return
-end
 
 
 
@@ -342,6 +293,11 @@ local function AssignPlot(Player: Player): string?
         if not PlotAssignments[PlotName] then
             PlotAssignments[PlotName] = Player
             PlayerPlots[Player.Name] = PlotName
+            -- Stamp ownership on the folder so clients resolve it statefully (no event-delivery race)
+            local PlotFolder = Plots:FindFirstChild(PlotName)
+            if PlotFolder then
+                PlotFolder:SetAttribute("Owner", Player.Name)
+            end
             return PlotName
         end
     end
@@ -551,13 +507,7 @@ local function OnPlayerAdded(Player: Player)
     -- 6) Apply any gamepass grants the player owns but hasn't had processed yet
     TransactionManager.OnPlayerAdded(Player)
 
-    -- 7) Setup starter pack timer/ad on the player's plot
-    SetupStarterPack(Player)
-
-    -- 8) Setup commander pass ad on the player's plot
-    SetupCommanderPass(Player)
-
-    -- 9) TODO Present player's offline earnings
+    -- 7) TODO Present player's offline earnings
     LoadPlayerEvent:FireClient(Player, PlayerData)
 end
 
@@ -590,16 +540,15 @@ local function OnPlayerRemoving(Player: Player)
         PlotAssignments[PlotName] = nil
         -- Re-enable prompts on the freed plot so the next player assigned here can use them
         local FreedPlot = Plots:FindFirstChild(PlotName)
-        if FreedPlot then SetPlotPromptsEnabled(FreedPlot, true) end
+        if FreedPlot then
+            SetPlotPromptsEnabled(FreedPlot, true)
+            FreedPlot:SetAttribute("Owner", nil)
+        end
     end
     PlayerPlots[Player.Name] = nil
 
     PlayerPlotManagers[Player.Name] = nil
     SessionStartTimes[Player.Name] = nil
-    StarterPackOpenStates[Player.Name] = nil
-    StarterPackTouchCooldowns[Player.Name] = nil
-    CommanderPassOpenStates[Player.Name] = nil
-    CommanderPassTouchCooldowns[Player.Name] = nil
 end
 
 local function UpdateSetting(Player: Player, Item: string)
@@ -817,23 +766,6 @@ UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
 	UnlockSlotEvent:FireClient(Player, Response, PlayerData)
 end)
 
-StarterPackEvent.OnServerEvent:Connect(function(Player: Player, Action: string)
-    if Action ~= "Closed" then
-        return
-    end
-
-    StarterPackOpenStates[Player.Name] = false
-    StarterPackTouchCooldowns[Player.Name] = os.clock() + 7
-end)
-
-CommanderPassEvent.OnServerEvent:Connect(function(Player: Player, Action: string)
-    if Action ~= "Closed" then
-        return
-    end
-
-    CommanderPassOpenStates[Player.Name] = false
-    CommanderPassTouchCooldowns[Player.Name] = os.clock() + 7
-end)
 
 -- Returns the player's assigned plot name. Used by client scripts that miss
 -- the PlotAssignmentEvent on join due to load order.

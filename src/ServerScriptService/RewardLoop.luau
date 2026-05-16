@@ -246,6 +246,11 @@ function RewardLoop.GetTotalPendingCash(PlayerName: string)
     return Total
 end
 
+-- Wipes all in-memory pending cash for a player (called after IdleRewards pays it out).
+function RewardLoop.ClearPendingCash(PlayerName: string)
+    PendingCash[PlayerName] = {}
+end
+
 function RewardLoop.ClearSoldier(PlayerName: string, Slot: string)
     -- 0) Check if player exists in tables
     if not Soldiers[PlayerName] then return end

@@ -379,6 +379,11 @@ end
 
 -- Switches the player's active target type and respawns targets on every unlocked lane.
 function PlotManager:SetTarget(TargetType: string)
+    if not SETTINGS.TARGET_DATA[TargetType] then
+        warn("[PlotManager] SetTarget called with unknown target type: " .. tostring(TargetType))
+        return
+    end
+
     local PlayerData = Data.Get(self.Player)
 
     if not PlayerData.Inventory.TargetInventory[TargetType] then

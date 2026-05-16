@@ -34,6 +34,24 @@ local LocalPlayerPlot = nil
 local LocalActiveSoldiers = {}
 local LocalActiveTarget = nil
 
+-- Returns the local player's Plot folder. Prefers the cached name from PlotAssignmentEvent,
+-- but scans the Owner attribute if the event was missed (e.g. require() blocked the handler).
+local function ResolveLocalPlot(): Instance?
+    local Plots = workspace:FindFirstChild("Plots")
+    if not Plots then return nil end
+    if LocalPlayerPlot then
+        local Cached = Plots:FindFirstChild(LocalPlayerPlot)
+        if Cached then return Cached end
+    end
+    for _, Plot in ipairs(Plots:GetChildren()) do
+        if Plot:GetAttribute("Owner") == LocalPlayer.Name then
+            LocalPlayerPlot = Plot.Name
+            return Plot
+        end
+    end
+    return nil
+end
+
 PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
     if PlayerName == LocalPlayer.Name then
         LocalPlayerPlot = PlotName
@@ -91,11 +109,11 @@ end
 
 -- Updates the CashPerSecondGui on a single lane's collect pad.
 local function RefreshLaneDPS(LaneNum: number)
-    if not LocalPlayerPlot then
-        -- Plot not assigned yet; retry once it is
+    local Plot = ResolveLocalPlot()
+    if not Plot then
         task.spawn(function()
             local Elapsed = 0
-            while not LocalPlayerPlot and Elapsed < 5 do
+            while not ResolveLocalPlot() and Elapsed < 5 do
                 task.wait(0.1)
                 Elapsed += 0.1
             end
@@ -103,8 +121,6 @@ local function RefreshLaneDPS(LaneNum: number)
         end)
         return
     end
-    local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
-    if not Plot then return end
     local CashCollectors = Plot:FindFirstChild("CashCollectors")
     if not CashCollectors then return end
     local PadModel = CashCollectors:FindFirstChild("CollectCash" .. LaneNum)
@@ -115,6 +131,8 @@ local function RefreshLaneDPS(LaneNum: number)
     if not DPSGui then return end
     local Label = DPSGui:FindFirstChildOfClass("TextLabel")
     if not Label then return end
+
+    DPSGui.Enabled = true
 
     local SoldierData = LocalActiveSoldiers[LaneNum]
     if not SoldierData or not LocalActiveTarget then
@@ -169,11 +187,11 @@ end
 
 -- Updates a single collect pad's CashToCollectGui with the current pending amount.
 local function OnUpdateCollectPad(LaneNum: number, Amount: number)
-    if not LocalPlayerPlot then
-        -- Plot not assigned yet; retry once it is
+    local Plot = ResolveLocalPlot()
+    if not Plot then
         task.spawn(function()
             local Elapsed = 0
-            while not LocalPlayerPlot and Elapsed < 5 do
+            while not ResolveLocalPlot() and Elapsed < 5 do
                 task.wait(0.1)
                 Elapsed += 0.1
             end
@@ -181,8 +199,6 @@ local function OnUpdateCollectPad(LaneNum: number, Amount: number)
         end)
         return
     end
-    local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
-    if not Plot then return end
     local CashCollectors = Plot:FindFirstChild("CashCollectors")
     if not CashCollectors then return end
     local PadModel = CashCollectors:FindFirstChild("CollectCash" .. LaneNum)
@@ -193,6 +209,7 @@ local function OnUpdateCollectPad(LaneNum: number, Amount: number)
     if not CashToCollectGui then return end
     local Label = CashToCollectGui:FindFirstChildOfClass("TextLabel")
     if Label then
+        CashToCollectGui.Enabled = true
         Label.Text = "$" .. tostring(Amount)
     end
 end
@@ -205,8 +222,7 @@ UpdateCollectPadEvent.OnClientEvent:Connect(OnUpdateCollectPad)
 
 -- Fires button tween, white flash, particle burst, and cash sound when a collect pad is stepped on.
 CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)
-    if not LocalPlayerPlot then return end
-    local Plot = workspace:WaitForChild("Plots"):FindFirstChild(LocalPlayerPlot)
+    local Plot = ResolveLocalPlot()
     if not Plot then return end
     local CashCollectors = Plot:FindFirstChild("CashCollectors")
     if not CashCollectors then return end
@@ -219,14 +235,18 @@ CollectCashEvent.OnClientEvent:Connect(function(LaneNum: number)
         -- Button face (thin 0.2-stud part): tween down then spring back + flash white
         if Child.Size.X < 0.3 then
             local OrigCFrame = Child.CFrame
+            local OrigColor = Child.Color
+            local OrigTransparency = Child.Transparency
             local PressIn = TweenService:Create(Child, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 CFrame = OrigCFrame * CFrame.new(0, -0.05, 0),
                 Color = Color3.new(1, 1, 1),
                 Transparency = 0,
             })
+            -- Spring back: restore original position, color, and transparency
             local PressOut = TweenService:Create(Child, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
                 CFrame = OrigCFrame,
-                Transparency = 1,
+                Color = OrigColor,
+                Transparency = OrigTransparency,
             })
             PressIn:Play()
             PressIn.Completed:Connect(function()

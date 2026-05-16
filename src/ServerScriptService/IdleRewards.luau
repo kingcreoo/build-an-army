@@ -13,10 +13,12 @@ local Players = game:GetService("Players")
 local Settings = require(ReplicatedStorage:WaitForChild("Settings"))
 local Data = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Data"))
 local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
+local TransactionManager = require(ServerScriptService:WaitForChild("TransactionManager"))
 
 -- // Variables
 local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local IdleRewardsEvent: RemoteEvent = Remotes:WaitForChild("IdleRewards")
+local UpdateCollectPadEvent: RemoteEvent = Remotes:WaitForChild("UpdateCollectPad")
 
 local Rewards = {}
 
@@ -95,61 +97,66 @@ end
 
 -- // Module Functions
 
--- Calculates if player is valid for rewards & assigns rewards to valid players
+-- Calculates if player is eligible for idle earnings + folds in uncollected pad cash.
+-- Shows the popup if there is anything to collect (idle earnings OR leftover pad cash).
 function IdleRewards.OnPlayerAdded(Player: Player, PlayerData: table)
-    -- 1) PRE CHECKS
+    -- 1) Sum uncollected pad cash from the previous session
+    local StoredPending = PlayerData["PendingCash"] or {}
+    local TotalPendingCash = 0
+    for _, Amount in pairs(StoredPending) do
+        TotalPendingCash += Amount
+    end
 
-    -- 1a)
-    if not PlayerData["LogOff"] then return end
+    -- 2) Attempt to calculate idle earnings (requires soldiers, target, and minimum time away)
+    local HasVIP = TransactionManager.IsPassOwned(Player, "CommanderPass")
+    local ClampedTimeAway = 0
+    local IdleEarnings = 0
 
-    -- 1b) ActiveSoldiers is a dict keyed by lane number; use next() to check emptiness.
-    if not next(PlayerData["Inventory"]["ActiveSoldiers"]) then return end
+    local CanEarnIdle = PlayerData["LogOff"]
+        and next(PlayerData["Inventory"]["ActiveSoldiers"])
+        and PlayerData["Inventory"]["ActiveTarget"] ~= nil
 
-    -- 1c)
-    if PlayerData["Inventory"]["ActiveTarget"] == nil then return end
+    if CanEarnIdle then
+        local RawTimeAway = os.time() - PlayerData["LogOff"]
+        if RawTimeAway >= Settings.IDLE_CONFIG.MinTimeAway then
+            local MaxTime = HasVIP and Settings.IDLE_CONFIG.CommanderCap or Settings.IDLE_CONFIG.FreeCap
+            ClampedTimeAway = math.min(RawTimeAway, MaxTime)
+            local RateMultiplier = HasVIP and Settings.IDLE_CONFIG.CommanderRate or Settings.IDLE_CONFIG.FreeRate
+            IdleEarnings = math.floor(CalculateRewards(PlayerData, ClampedTimeAway) * RateMultiplier)
+        end
+    end
 
-    -- 2) Get player's timings
-    local LogOffTime = PlayerData["LogOff"]
-    local CurrentTime = os.time()
-    local RawTimeAway = CurrentTime - LogOffTime
+    -- 3) Nothing to show if both are zero
+    local TotalDisplay = IdleEarnings + TotalPendingCash
+    if TotalDisplay <= 0 then return end
 
-    -- If player was away for less than the minimum threshold, skip
-    if RawTimeAway < Settings.IDLE_CONFIG.MinTimeAway then return end
+    -- 4) Store only idle earnings here; pending cash is paid via GetTotalPendingCash in ClaimRewards
+    Rewards[Player.Name] = IdleEarnings
 
-    -- 2a) Clamp player's away time to Commander or free-tier cap
-    local HasVIP = false -- TODO check Commander Pass ownership via TransactionManager
-    local MaxTime = HasVIP and Settings.IDLE_CONFIG.CommanderCap or Settings.IDLE_CONFIG.FreeCap
-    local ClampedTimeAway = math.min(RawTimeAway, MaxTime)
-
-    -- 3) Calculate raw live-equivalent rewards, then apply idle rate multiplier
-    local PlayerRewards = CalculateRewards(PlayerData, ClampedTimeAway)
-    local RateMultiplier = HasVIP and Settings.IDLE_CONFIG.CommanderRate or Settings.IDLE_CONFIG.FreeRate
-    PlayerRewards = math.floor(PlayerRewards * RateMultiplier)
-
-    -- 4) Store player's rewards in the rewards table
-    Rewards[Player.Name] = PlayerRewards
-
-    -- 5) Fire client to show rewards GUI frame
-    IdleRewardsEvent:FireClient(Player, PlayerRewards, HasVIP, ClampedTimeAway)
+    -- 5) Fire client showing the combined total so the player sees the full picture
+    IdleRewardsEvent:FireClient(Player, TotalDisplay, HasVIP, ClampedTimeAway)
 end
 
 function IdleRewards.ClaimRewards(Player: Player)
     if not Rewards[Player.Name] then return end
 
     local PlayerData = Data.Get(Player)
-
-    -- Lump uncollected per-lane pending cash in with idle rewards for simplicity
     local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
-    local UncollectedCash = RewardLoop.GetTotalPendingCash(Player.Name)
 
+    local UncollectedCash = RewardLoop.GetTotalPendingCash(Player.Name)
     PlayerData["leaderstats"]["Credits"] += Rewards[Player.Name] + UncollectedCash
 
-    -- Clear all pending cash lanes since we've paid them out
+    -- Clear pending cash in DataStore, in RewardLoop's in-memory table, and in the popup store
     PlayerData["PendingCash"] = {}
-
+    RewardLoop.ClearPendingCash(Player.Name)
     Rewards[Player.Name] = nil
 
     Data.Set(Player, PlayerData)
+
+    -- Reset all collect pad labels to $0 on the client so they reflect the claim
+    for Lane = 1, 8 do
+        UpdateCollectPadEvent:FireClient(Player, Lane, 0)
+    end
 end
 
 -- // Events
