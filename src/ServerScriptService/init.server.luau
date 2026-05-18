@@ -783,8 +783,11 @@ SellSoldierEvent.OnServerEvent:Connect(function(Player: Player, SoldierID: strin
 end)
 
 UnlockSlotEvent.OnServerEvent:Connect(function(Player: Player)
-    -- 1 unlock per 3s — unlocks are one-at-a-time by design
-    if not RateLimit.Check(Player, "UnlockSlot", 1, 3) then
+    -- 4 unlocks per 5s — enough to chain lanes 4→7 quickly, still kills spam.
+    -- Always fire a response so the client clears its in-flight debounce; otherwise the
+    -- client gets stuck on "Slow down!" if the rate limit ever trips.
+    if not RateLimit.Check(Player, "UnlockSlot", 4, 5) then
+        UnlockSlotEvent:FireClient(Player, "RateLimit", nil)
         return
     end
 	local Response, PlayerData = UnlockSlot(Player)

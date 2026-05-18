@@ -165,6 +165,13 @@ local function AttemptPurchase()
 
 	-- Fire server to process purchase
 	UnlockSlotEvent:FireServer()
+
+	-- Fail-safe: clear the in-flight debounce after 3s even if the server never responds.
+	-- Stops "Slow down!" from locking the UI forever if a remote drops or the server returns
+	-- silently for any reason. The response handler clears it earlier on a real reply.
+	task.delay(3, function()
+		PurchaseDebounce = false
+	end)
 end
 
 -- // Events
@@ -235,6 +242,10 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 		-- Server returned this because the lane needs a rebirth the player hasn't done yet
 		local Req = GetRebirthRequirement(NextSlotToUnlock or 0) or 1
 		NotifyBindable:Fire("Requires Rebirth " .. Req .. "!", 0.8, Color3.fromRGB(255, 100, 100))
+	elseif Response == "RateLimit" then
+		-- Server bounced us off the rate limit. PurchaseDebounce was already cleared above
+		-- (top of this handler), so the next click works once the player slows down a bit.
+		NotifyBindable:Fire("Slow down!", 0.8, Color3.fromRGB(255, 0, 0))
 	else
 		NotifyBindable:Fire("Error unlocking slot!", 0.8, Color3.fromRGB(255, 0, 0))
 	end
