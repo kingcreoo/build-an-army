@@ -44,6 +44,7 @@ local UnlockSlotFrame: Frame = FramesGui:WaitForChild("UnlockSlotFrame")
 local StarterPackFrame: Frame = FramesGui:WaitForChild("StarterPackFrame")
 local CommanderPassFrame: Frame = FramesGui:WaitForChild("CommanderPassFrame")
 local BoostTreeFrame: Frame = FramesGui:WaitForChild("BoostTreeFrame")
+local RebirthWizardFrame: Frame = FramesGui:WaitForChild("RebirthWizardFrame")
 
 local IdleRewardsFrame: Frame = FramesGui:WaitForChild("IdleRewardsFrame")
 local IdleRewardsAmount: TextLabel = IdleRewardsFrame:WaitForChild("MainFrame"):WaitForChild("Amount")
@@ -54,8 +55,8 @@ local IdleRewardsClaimButton: TextButton = IdleRewardsFrame:WaitForChild("MainFr
 local NotificationFrame: Frame = FramesGui:WaitForChild("NotificationFrame")
 local TemplateNotification: TextLabel = NotificationFrame:WaitForChild("TemplateNotification")
 
-local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame, UnlockSlotFrame, BoostTreeFrame}
-local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false, UnlockSlotFrame = false, BoostTreeFrame = false}
+local PromptedFrames = {SoldierShopFrame, UpgradeTargetFrame, SellSoldiersFrame, UnlockSlotFrame, BoostTreeFrame, RebirthWizardFrame}
+local PromptedFrameDebounces = {SoldierShopFrame = false, UpgradeTargetFrame = false, SellSoldiersFrame = false, UnlockSlotFrame = false, BoostTreeFrame = false, RebirthWizardFrame = false}
 
 local HUDButtons = {SoldiersButton}
 local HUDButtonsPulse = {StoreContainer, SettingsButton, CreditsButton, CommanderPassHUD}
@@ -588,7 +589,7 @@ local UI_NAME_TO_FRAME = {
     ["StarterPack"]    = StarterPackFrame,
     ["CommanderPass"]  = CommanderPassFrame,
     ["Boost"]          = BoostTreeFrame,
-    -- Rebirth, UnlockRebirthLane, UnlockCommanderLane: stubs until those systems exist
+    ["Rebirth"]        = RebirthWizardFrame,
 }
 
 -- When the local player's plot is assigned, wire PromptHidden on every ring
@@ -601,6 +602,7 @@ local RING_NAME_TO_UI = {
     ["StarterPackRing"]    = "StarterPack",
     ["CommanderPassRing"]  = "CommanderPass",
     ["BoostRing"]          = "Boost",
+    ["RebirthRing"]        = "Rebirth",
 }
 
 PlotAssignmentEvent.OnClientEvent:Connect(function(PlayerName: string, PlotName: string)
@@ -740,6 +742,7 @@ end)
 StarterPackFrame.Visible = false
 CommanderPassFrame.Visible = false
 BoostTreeFrame.Visible = false
+RebirthWizardFrame.Visible = false
 HUD:WaitForChild("BoostsDisplay").Visible = false
 
 -- Animation stuff

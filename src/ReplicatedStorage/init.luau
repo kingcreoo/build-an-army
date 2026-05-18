@@ -45,9 +45,15 @@ SETTINGS.DEFAULT_DATA = {
     },
     -- Per-lane pending cash keyed by lane number (1-8). Persists between sessions.
     ["PendingCash"] = {},
-    -- Rebirth scaffolding. Filled in when the rebirth system lands.
+    -- Rebirth scaffolding. Rebirths persist through subsequent rebirths.
     ["Rebirths"] = 0,
     ["RebirthTokens"] = 0,
+    -- Tracks which one-shot rebirth picks the player has already taken. Entries persist forever
+    -- so the wizard can hide them from the next rebirth's selection pool.
+    ["Rebirth"] = {
+        ["PickedSoldiers"] = {}, -- [SoldierType]   = true
+        ["PickedBoosts"]   = {}  -- [BoostTypeKey]  = true
+    },
     -- Active timed boosts, keyed by boost type. At most one entry per type (merge math enforces this).
     -- Entry shape: { Amount = number, ExpiresAt = number (os.time), Source = string }
     -- Permanent boosts from rebirths, keyed by boost type. Value = multiplier amount (e.g. 1.5).
@@ -463,6 +469,92 @@ SETTINGS.SOLDIER_DATA = {
             ["DelayBetweenBullets"] = 0.1,
             ["SpreadIntensity"] = 1
         }
+    },
+
+    -- ============================================================
+    -- REBIRTH SOLDIERS — Awarded one per rebirth, marked Special so the
+    -- inventory wipe on next rebirth preserves them. Kits are placeholder;
+    -- real designs are deferred per IMPLEMENTATION_CONTEXT.md.
+    -- ============================================================
+
+    ["Machine Gunner"] = {
+        ["Tier"] = 4,
+        ["Model"] = PLACEHOLDER_MODEL,
+        ["Price"] = 0,
+        ["RobuxPrice"] = 0,
+        ["RobuxProductId"] = 0,
+        ["Rarity"] = 1.0,
+        ["Image"] = PLACEHOLDER_IMAGE,
+        -- Magenta identity. Wizard / inventory visuals are baked from these values.
+        ["Color"] = Color3.fromRGB(232, 60, 130),
+        ["ShopColor"] = Color3.fromRGB(232, 60, 130),
+        ["ShopGradient1"] = Color3.fromRGB(255, 194, 224),
+        ["ShopGradient2"] = Color3.fromRGB(190, 40, 110),
+        ["Weapon"] = "M4", -- TODO: dedicated rebirth model
+        ["SellValue"] = 0,
+        ["Special"] = true, -- Persists across future rebirths and is unsellable
+        ["Description"] = "REBIRTH. Sustained automatic fire.",
+        ["WeaponType"] = "Automatic",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 0.4,
+            ["Damage"] = 18,
+            ["BulletSpeed"] = 180,
+            ["SpreadIntensity"] = 0.8
+        }
+    },
+
+    ["Mortar"] = {
+        ["Tier"] = 4,
+        ["Model"] = PLACEHOLDER_MODEL,
+        ["Price"] = 0,
+        ["RobuxPrice"] = 0,
+        ["RobuxProductId"] = 0,
+        ["Rarity"] = 1.0,
+        ["Image"] = PLACEHOLDER_IMAGE,
+        -- Burnt-orange identity.
+        ["Color"] = Color3.fromRGB(230, 130, 50),
+        ["ShopColor"] = Color3.fromRGB(230, 130, 50),
+        ["ShopGradient1"] = Color3.fromRGB(255, 205, 160),
+        ["ShopGradient2"] = Color3.fromRGB(180, 75, 30),
+        ["Weapon"] = "M4", -- TODO: dedicated rebirth model
+        ["SellValue"] = 0,
+        ["Special"] = true,
+        ["Description"] = "REBIRTH. Slow heavy hits.",
+        ["WeaponType"] = "Automatic",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 2.0,
+            ["Damage"] = 120,
+            ["BulletSpeed"] = 90,
+            ["SpreadIntensity"] = 0.5
+        }
+    },
+
+    ["The Gang"] = {
+        ["Tier"] = 4,
+        ["Model"] = PLACEHOLDER_MODEL,
+        ["Price"] = 0,
+        ["RobuxPrice"] = 0,
+        ["RobuxProductId"] = 0,
+        ["Rarity"] = 1.0,
+        ["Image"] = PLACEHOLDER_IMAGE,
+        -- Deep-teal identity.
+        ["Color"] = Color3.fromRGB(60, 180, 175),
+        ["ShopColor"] = Color3.fromRGB(60, 180, 175),
+        ["ShopGradient1"] = Color3.fromRGB(165, 240, 235),
+        ["ShopGradient2"] = Color3.fromRGB(40, 120, 120),
+        ["Weapon"] = "M4", -- TODO: dedicated rebirth model
+        ["SellValue"] = 0,
+        ["Special"] = true,
+        ["Description"] = "REBIRTH. Burst squad fire.",
+        ["WeaponType"] = "Burst",
+        ["WeaponInfo"] = {
+            ["FireRate"] = 1.0,
+            ["Damage"] = 14,
+            ["BulletSpeed"] = 140,
+            ["Bullets"] = 5,
+            ["DelayBetweenBullets"] = 0.08,
+            ["SpreadIntensity"] = 1.2
+        }
     }
 }
 
@@ -477,6 +569,10 @@ SETTINGS.SHOP_ORDER = {
 -- Ordered by RawDPS from the economy spreadsheet so AutoEquip always picks the highest-DPS
 -- owned soldiers regardless of how much they cost.
 SETTINGS.RATING_ORDER = {
+    -- Rebirth soldiers sit above the standard roster so AutoEquip favors them.
+    "Machine Gunner",
+    "Mortar",
+    "The Gang",
     "Akimbo",        -- 25.71 DPS
     "Vector",        -- 23.33 DPS
     "Hyper Sniper",  -- 20.00 DPS (premium)
@@ -590,13 +686,21 @@ SETTINGS.TARGET_ORDER = {
 }
 
 -- Lane unlock prices. Numeric = credit cost. Strings = special unlock source.
--- "Rebirth" = unlocked via rebirth token (lane 7). "Commander" = unlocked via Commander Pass (lane 8).
+-- Lanes 6 and 7 are credit-priced but gated on rebirth count (see SLOT_REBIRTH_REQUIREMENTS).
+-- "Commander" = unlocked via Commander Pass (lane 8).
 SETTINGS.SLOT_PRICES = {
     [4] = 2500,
     [5] = 10000,
     [6] = 100000,
-    [7] = "Rebirth",
+    [7] = 1000000,
     [8] = "Commander"
+}
+
+-- Rebirth prerequisites for credit-priced lanes. Player needs at least N rebirths
+-- before the lane can be purchased. Lanes not listed have no rebirth prereq.
+SETTINGS.SLOT_REBIRTH_REQUIREMENTS = {
+    [6] = 1,
+    [7] = 2
 }
 
 SETTINGS.DISTANCES = {
@@ -630,6 +734,35 @@ SETTINGS.BOOST_TREE = {
     ["Slot1"] = { ["RebirthRequired"] = 0, ["BoostAmount"] = 1.5, ["GenerationSeconds"] = 480, ["BoostDuration"] = 120  },
     ["Slot2"] = { ["RebirthRequired"] = 1, ["BoostAmount"] = 2.0, ["GenerationSeconds"] = 360, ["BoostDuration"] = 150  },
     ["Slot3"] = { ["RebirthRequired"] = 2, ["BoostAmount"] = 2.5, ["GenerationSeconds"] = 300, ["BoostDuration"] = 180  },
+}
+
+-- Rebirth system configuration. Cap is enforced server-side in RebirthManager.
+SETTINGS.REBIRTH_CONFIG = {
+    ["MaxRebirths"] = 2,
+    -- Credit cost gating each rebirth tier (indexed by the rebirth number being purchased).
+    ["Costs"] = {
+        [1] = 10000,
+        [2] = 250000
+    },
+    -- Credits the player ends with immediately after the reset.
+    ["StartingCredits"] = 100
+}
+
+-- The 3 rebirth soldier options, keyed by the Soldiers folder slot name in RebirthWizardFrame.
+-- Each entry references a SOLDIER_DATA key. Once picked, the soldier is removed from the next
+-- rebirth's pool via PlayerData.Rebirth.PickedSoldiers.
+SETTINGS.REBIRTH_SOLDIERS = {
+    ["Slot1"] = "Machine Gunner",
+    ["Slot2"] = "Mortar",
+    ["Slot3"] = "The Gang"
+}
+
+-- The 3 permanent boost options, keyed by the Boosts folder frame name in RebirthWizardFrame.
+-- All boost types are global multipliers that flow through BoostManager.AddPermanentBoost.
+SETTINGS.REBIRTH_BOOSTS = {
+    ["DamageBoost"]   = { ["Type"] = "DamageMultiplier",   ["Amount"] = 1.5  },
+    ["FirerateBoost"] = { ["Type"] = "FireRateMultiplier", ["Amount"] = 1.5  },
+    ["TargetBoost"]   = { ["Type"] = "TargetMultiplier",   ["Amount"] = 1.33 }
 }
 
 -- Cash pack Robux products (credit amounts granted per pack)

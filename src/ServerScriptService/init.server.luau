@@ -15,6 +15,7 @@ local SETTINGS = require(ReplicatedStorage:WaitForChild("Settings"))
 local RewardLoop = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RewardLoop"))
 local IdleRewards = require(ServerScriptService:WaitForChild("Server"):WaitForChild("IdleRewards"))
 local BoostManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("BoostManager"))
+local RebirthManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RebirthManager"))
 local TransactionManager = require(ServerScriptService:WaitForChild("Server"):WaitForChild("TransactionManager"))
 local RateLimit = require(ServerScriptService:WaitForChild("Server"):WaitForChild("RateLimit"))
 
@@ -315,6 +316,8 @@ local function BroadcastAssignmentsTo(Player: Player)
 end
 
 -- Maps ring model names to UI identifiers sent to the client.
+-- Lanes 6 and 7 use the standard UnlockLaneRing with a rebirth prereq check,
+-- so UnlockRebirthLaneRing is intentionally absent.
 local RING_TO_UI = {
     ["SoldierShopRing"]        = "SoldierShop",
     ["UpgradeTargetRing"]      = "UpgradeTarget",
@@ -324,8 +327,6 @@ local RING_TO_UI = {
     ["RebirthRing"]            = "Rebirth",
     ["CommanderPassRing"]      = "CommanderPass",
     ["StarterPackRing"]        = "StarterPack",
-    ["UnlockRebirthLaneRing"]  = "UnlockRebirthLane",
-    ["UnlockCommanderLaneRing"] = "UnlockCommanderLane",
 }
 
 -- Positions the UnlockLaneRing at the requested slot using the nearest SoldierSpawn offset.
@@ -346,7 +347,10 @@ local function MoveUnlockLaneRingToSlot(PlotFolder: Instance, Ring: Model, SlotN
 end
 
 -- Toggles the UnlockLaneRing on/off and updates its price label based on next unlockable slot.
--- Call this on join and after each successful unlock.
+-- Walks lanes 4-7 (4-5 = pure credits, 6 = credits + 1 rebirth, 7 = credits + 2 rebirths).
+-- The ring still appears when the rebirth prereq is unmet so the player sees the gate;
+-- the price label flips to "Requires Rebirth N" in that case.
+-- Call this on join and after each successful unlock / rebirth.
 local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
     local PlayerData = Data.Get(Player)
     local Ring = PlotFolder:FindFirstChild("InteractionRings") and PlotFolder.InteractionRings:FindFirstChild("UnlockLaneRing")
@@ -359,9 +363,9 @@ local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
     local PriceGui = GuiParts and GuiParts:FindFirstChild("Price")
     local LabelGui = GuiParts and GuiParts:FindFirstChild("Label")
 
-    -- Find next credit-purchasable slot (4-6)
+    -- Find the next credit-purchasable slot (4-7). Lane 8 is gated by Commander Pass only.
     local NextSlot = nil
-    for i = 4, 6 do
+    for i = 4, 7 do
         if not PlayerData.Plot.Unlocks["Slot" .. i] then
             NextSlot = i
             break
@@ -389,7 +393,14 @@ local function RefreshUnlockLaneRing(Player: Player, PlotFolder: Instance)
         if Visible and NextSlot then
             local PriceLabel = PriceGui:FindFirstChildOfClass("TextLabel")
             if PriceLabel then
-                PriceLabel.Text = "$" .. tostring(SETTINGS.SLOT_PRICES[NextSlot])
+                local RebirthReq = SETTINGS.SLOT_REBIRTH_REQUIREMENTS[NextSlot]
+                local CurrentRebirths = PlayerData.Rebirths or 0
+                if RebirthReq and CurrentRebirths < RebirthReq then
+                    -- Rebirth wall: show prereq text instead of the cash price
+                    PriceLabel.Text = "Requires Rebirth " .. RebirthReq
+                else
+                    PriceLabel.Text = "$" .. tostring(SETTINGS.SLOT_PRICES[NextSlot])
+                end
             end
         end
     end
@@ -627,14 +638,15 @@ local function SellSoldier(Player: Player, SoldierID: string)
     return "Sold", PlayerData
 end
 
--- Unlocks the next credit-priced lane (4-6 only).
--- Lane 7 = rebirth token (handled by RebirthRing). Lane 8 = commander pass (handled by CommanderRing).
+-- Unlocks the next credit-priced lane (4-7).
+-- Lanes 6 and 7 additionally require Rebirths >= N (see SETTINGS.SLOT_REBIRTH_REQUIREMENTS).
+-- Lane 8 is gated by Commander Pass and handled by the gamepass grant path.
 local function UnlockSlot(Player: Player)
     local PlayerData = Data.Get(Player)
 
-    -- Find the next 4-6 lane that's locked
+    -- Find the next 4-7 lane that's locked
     local NextSlot = nil
-    for i = 4, 6 do
+    for i = 4, 7 do
         if not PlayerData.Plot.Unlocks["Slot" .. i] then
             NextSlot = i
             break
@@ -647,8 +659,14 @@ local function UnlockSlot(Player: Player)
 
     local Price = SETTINGS.SLOT_PRICES[NextSlot]
     if type(Price) ~= "number" then
-        -- Should never hit; lanes 4-6 are pure credit cost.
+        -- Should never hit; lanes 4-7 are pure credit cost. Lane 8 is commander-pass only.
         return "Invalid", nil
+    end
+
+    -- Rebirth prereq for lanes 6 and 7
+    local RebirthReq = SETTINGS.SLOT_REBIRTH_REQUIREMENTS[NextSlot]
+    if RebirthReq and (PlayerData.Rebirths or 0) < RebirthReq then
+        return "RebirthRequired", nil
     end
 
     if PlayerData["leaderstats"]["Credits"] < Price then
@@ -778,6 +796,33 @@ ClaimBoostTreeEvent.OnServerEvent:Connect(function(Player: Player, SlotNumber: a
     -- 1 claim per 3s — claims are deliberate one-at-a-time actions
     if not RateLimit.Check(Player, "ClaimBoostTree", 1, 3) then return end
     BoostManager.ClaimBoostTreeSlot(Player, SlotNumber)
+end)
+
+-- Rebirth flow. Client sends ("Slot1".."Slot3", "DamageBoost"/"FirerateBoost"/"TargetBoost").
+-- Server validates, performs the atomic reset+grant, then pushes fresh data via LoadPlayerEvent.
+-- On success we also AutoEquip (so the new rebirth soldier deploys) and refresh the unlock ring
+-- (lane reset + new rebirth count changes the label / prereq state).
+local PerformRebirthEvent: RemoteEvent = EnsureRemoteEvent("PerformRebirth")
+PerformRebirthEvent.OnServerEvent:Connect(function(Player: Player, PickedSoldierSlot: any, PickedBoostFrame: any)
+    -- 1 rebirth attempt per 5s — rebirths are a deliberate one-at-a-time action
+    if not RateLimit.Check(Player, "PerformRebirth", 1, 5) then
+        PerformRebirthEvent:FireClient(Player, "RateLimit")
+        return
+    end
+
+    local PlotManager = PlayerPlotManagers[Player.Name]
+    local Success, Reason = RebirthManager.PerformRebirth(Player, PickedSoldierSlot, PickedBoostFrame, PlotManager)
+
+    if Success then
+        -- Deploy the new rebirth soldier into the next empty unlocked lane (no-op if AutoEquip is off)
+        AutoEquip(Player)
+        -- Reset lanes invalidate the unlock ring's position / label
+        if PlotManager and PlotManager.Plot then
+            RefreshUnlockLaneRing(Player, PlotManager.Plot)
+        end
+    end
+
+    PerformRebirthEvent:FireClient(Player, Reason, Success)
 end)
 
 -- Returns the player's assigned plot name. Used by client scripts that miss

@@ -47,16 +47,18 @@ local PurchaseDebounce = false
 
 -- // Functions
 
--- Finds the next slot (4, 5, or 6) that can be unlocked
+-- Finds the next credit-priced slot (4-7) the player has not yet unlocked.
+-- Lanes 6 and 7 require a rebirth prereq that's still enforced server-side; the UI shows the
+-- gate text instead of a purchase prompt when the prereq isn't met (see UpdateDisplay).
 local function GetNextSlotToUnlock(PlayerData: table)
 	local Unlocks = PlayerData.Plot.Unlocks
-	
-	for i = 4, 6 do
+
+	for i = 4, 7 do
 		if not Unlocks["Slot" .. i] then
 			return i
 		end
 	end
-	
+
 	return nil
 end
 
@@ -76,15 +78,27 @@ local function FormatNumber(Number: number)
 	return Result
 end
 
--- Updates the display with the next slot info
+-- Returns the rebirth requirement for a slot, or nil if none.
+local function GetRebirthRequirement(Slot: number): number?
+	return SETTINGS.SLOT_REBIRTH_REQUIREMENTS and SETTINGS.SLOT_REBIRTH_REQUIREMENTS[Slot] or nil
+end
+
+-- Updates the display with the next slot info. When the next slot is gated on a rebirth
+-- the player hasn't reached, the amount label shows "Requires Rebirth N" instead of a price.
 local function UpdateDisplay()
 	if not NextSlotToUnlock then return end
 	if not LatestData then return end
-	
+
 	local Price = SETTINGS.SLOT_PRICES[NextSlotToUnlock]
-	
 	TextLabel.Text = "UNLOCK SLOT " .. NextSlotToUnlock
-	AmountLabel.Text = "$" .. FormatNumber(Price)
+
+	local RebirthReq = GetRebirthRequirement(NextSlotToUnlock)
+	local CurrentRebirths = LatestData.Rebirths or 0
+	if RebirthReq and CurrentRebirths < RebirthReq then
+		AmountLabel.Text = "Requires Rebirth " .. RebirthReq
+	else
+		AmountLabel.Text = "$" .. FormatNumber(Price)
+	end
 end
 
 -- Cleans up when player has all purchasable slots (4-6)
@@ -131,7 +145,16 @@ local function AttemptPurchase()
 	end
 	
 	PurchaseDebounce = true
-	
+
+	-- Client-side rebirth prereq check (server re-validates)
+	local RebirthReq = GetRebirthRequirement(NextSlotToUnlock)
+	local CurrentRebirths = LatestData.Rebirths or 0
+	if RebirthReq and CurrentRebirths < RebirthReq then
+		NotifyBindable:Fire("Requires Rebirth " .. RebirthReq .. "!", 0.8, Color3.fromRGB(255, 100, 100))
+		PurchaseDebounce = false
+		return
+	end
+
 	-- Client-side fund check
 	local Price = SETTINGS.SLOT_PRICES[NextSlotToUnlock]
 	if LocalPlayer:WaitForChild("leaderstats"):WaitForChild("Credits").Value < Price then
@@ -139,7 +162,7 @@ local function AttemptPurchase()
 		PurchaseDebounce = false
 		return
 	end
-	
+
 	-- Fire server to process purchase
 	UnlockSlotEvent:FireServer()
 end
@@ -181,22 +204,25 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 	PurchaseDebounce = false
 	
 	if Response == "Unlocked" and PlayerData then
-		-- Successful unlock
+		-- Successful unlock — cache data, notify, refresh display, and close the frame so the
+		-- player has to walk over to the next lane's ring rather than chain-buying from here.
 		SOUND_MANAGER:PlayPurchase()
 		NotifyBindable:Fire("Slot " .. NextSlotToUnlock .. " unlocked!", 0.8, Color3.fromRGB(0, 255, 0))
 		LatestData = PlayerData
 		UpdateInventoryBindable:Fire(PlayerData)
-		
-		-- Check for next slot
+
+		-- Recompute next slot so the display is correct the NEXT time the frame opens
 		NextSlotToUnlock = GetNextSlotToUnlock(PlayerData)
-		
 		if NextSlotToUnlock then
-			-- More slots available, update display
 			UpdateDisplay()
 		else
-			-- All purchasable slots unlocked
-			task.wait(0.15)
+			-- No more credit-priced lanes left; cleanup hook handles any maxed-out UI state
 			CleanupForMaxedPlayer()
+		end
+
+		-- Always close the frame on success — player must approach the new ring to buy more
+		if UnlockSlotFrame.Visible then
+			CloseFrameBindable:Fire(UnlockSlotFrame)
 		end
 	elseif Response == "Insufficient" then
 		NotifyBindable:Fire("Insufficient funds!", 0.8, Color3.fromRGB(255, 0, 0))
@@ -205,9 +231,10 @@ UnlockSlotEvent.OnClientEvent:Connect(function(Response: string, PlayerData: tab
 	elseif Response == "MaxSlots" then
 		NotifyBindable:Fire("All slots unlocked!", 0.8, Color3.fromRGB(255, 255, 0))
 		CleanupForMaxedPlayer()
-	elseif Response == "VIPRequired" then
-		-- Should not occur for lanes 4-6; lanes 7-8 handled by their own rings.
-		NotifyBindable:Fire("Use the rebirth or commander ring!", 0.8, Color3.fromRGB(255, 255, 0))
+	elseif Response == "RebirthRequired" then
+		-- Server returned this because the lane needs a rebirth the player hasn't done yet
+		local Req = GetRebirthRequirement(NextSlotToUnlock or 0) or 1
+		NotifyBindable:Fire("Requires Rebirth " .. Req .. "!", 0.8, Color3.fromRGB(255, 100, 100))
 	else
 		NotifyBindable:Fire("Error unlocking slot!", 0.8, Color3.fromRGB(255, 0, 0))
 	end

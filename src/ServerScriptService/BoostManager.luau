@@ -275,6 +275,29 @@ function BoostManager.AddPermanentBoost(PlayerData: table, BoostType: string, Am
     PlayerData.Boosts.Permanent[BoostType] = Amount
 end
 
+-- Starts in-memory generation timers for any tree slots that became newly unlocked
+-- (e.g. after a rebirth). Idempotent — slots that are still locked, already ready,
+-- or already timing keep their current state. Caller must already hold a session
+-- entry for the player (BoostManager.SetupPlayer must have run).
+function BoostManager.RefreshTreeTimers(Player: Player, PlayerData: table)
+    local Timers = TreeTimers[Player.Name]
+    if not Timers then return end
+
+    local Rebirths = PlayerData.Rebirths or 0
+    for i = 1, 3 do
+        local SlotKey = "Slot" .. i
+        local SlotConfig = SETTINGS.BOOST_TREE[SlotKey]
+        local SlotData = PlayerData.BoostTree and PlayerData.BoostTree[SlotKey]
+        if not SlotData then continue end
+        if Rebirths < SlotConfig.RebirthRequired then continue end -- still locked
+        if SlotData.PendingBoost then continue end                 -- already ready to claim
+        if Timers[SlotKey] then continue end                       -- already generating this session
+        Timers[SlotKey] = tick()
+        -- Tell the client this slot transitioned from Locked -> Generating
+        UpdateBoostTreeEvent:FireClient(Player, SlotKey, false)
+    end
+end
+
 -- Hot-path read used by RewardLoop Heartbeat. Falls back to 1 (no boost) if not set up.
 function BoostManager.GetCachedMultiplier(PlayerName: string, BoostType: string): number
     local PlayerCache = EffectiveMultipliers[PlayerName]
